@@ -13,42 +13,60 @@
         <form method="POST">
             {% csrf_token %}
             
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+
             <div class="mb-3">
                 <label class="form-label">Username</label>
-                <input type="text" name="username" class="form-control" required>
+                {{ form.username }}
+                {% if form.username.errors %}
+                    <div class="text-danger">{{ form.username.errors.0 }}</div>
+                {% endif %}
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Email</label>
-                <input type="email" name="email" class="form-control" required>
+                {{ form.email }}
+                {% if form.email.errors %}
+                    <div class="text-danger">{{ form.email.errors.0 }}</div>
+                {% endif %}
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Contact</label>
-                <input type="text" name="contact" class="form-control" required>
+                {{ form.contact }}
+                {% if form.contact.errors %}
+                    <div class="text-danger">{{ form.contact.errors.0 }}</div>
+                {% endif %}
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Password</label>
-                <input type="password" name="password" class="form-control" required>
+                {{ form.password }}
+                {% if form.password.errors %}
+                    <div class="text-danger">{{ form.password.errors.0 }}</div>
+                {% endif %}
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Status</label>
-                <select name="status" class="form-control">
-                    <option value="ACTIVE">Active</option>
-                    <option value="FROZEN">Frozen</option>
-                </select>
+                {{ form.status }}
+                {% if form.status.errors %}
+                    <div class="text-danger">{{ form.status.errors.0 }}</div>
+                {% endif %}
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Role</label>
-                <select name="role" class="form-control">
-                    <option value="">Select Role</option>
-                    {% for role in roles %}
-                        <option value="{{ role.id }}">{{ role.name }}</option>
-                    {% endfor %}
-                </select>
+                {{ form.role }}
+                {% if form.role.errors %}
+                    <div class="text-danger">{{ form.role.errors.0 }}</div>
+                {% endif %}
             </div>
 
             <button type="submit" class="btn btn-success">Save</button>
@@ -58,4 +76,3 @@
 
 </div>
 {% endblock %}
-
