@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from django.db import IntegrityError, transaction
 from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -91,38 +92,84 @@ def employee_list(request):
 
 
 @login_required
-# @user_passes_test(is_manager)
+@user_passes_test(is_manager)
 def employee_create(request):
+    roles = Group.objects.all()
+
     if request.method == 'POST':
         # Grab form data manually
-        username = request.POST.get('username')
-        email = request.POST.get('email')
-        contact = request.POST.get('contact')
-        password = request.POST.get('password')
+        username = (request.POST.get('username') or '').strip()
+        email = (request.POST.get('email') or '').strip()
+        contact = (request.POST.get('contact') or '').strip()
+        password = request.POST.get('password') or ''
         status = request.POST.get('status', 'ACTIVE')
-        role_id = request.POST.get('role')
+        role_id = (request.POST.get('role') or '').strip()
 
-        # Create Django User
-        user = User.objects.create_user(username=username, email=email, password=password)
+        # Basic validation
+        if not username or not email or not contact or not password:
+            messages.error(request, "Please fill in all required fields.")
+            return render(request, 'users/employee_create.html', {
+                'title': 'Register Employee',
+                'roles': roles,
+            })
 
-        # Assign role if selected
-        role = Group.objects.get(pk=role_id) if role_id else None
+        if User.objects.filter(username=username).exists():
+            messages.error(request, f"Username '{username}' is already taken.")
+            return render(request, 'users/employee_create.html', {
+                'title': 'Register Employee',
+                'roles': roles,
+            })
 
-        # Create Employee
-        Employee.objects.create(
-            username=username,
-            email=email,
-            contact=contact,
-            password=password,
-            status=status,
-            role=role,
-            user=user
-        )
+        if Employee.objects.filter(email=email).exists():
+            messages.error(request, f"Email '{email}' is already registered for an employee.")
+            return render(request, 'users/employee_create.html', {
+                'title': 'Register Employee',
+                'roles': roles,
+            })
 
+        # Assign role if selected (else default to Clerk if it exists)
+        role = None
+        if role_id:
+            role = Group.objects.filter(pk=role_id).first()
+            if role is None:
+                messages.error(request, "Selected role is invalid.")
+                return render(request, 'users/employee_create.html', {
+                    'title': 'Register Employee',
+                    'roles': roles,
+                })
+        else:
+            role = Group.objects.filter(name='Clerk').first()
+
+        try:
+            with transaction.atomic():
+                # Create Django User
+                user = User.objects.create_user(username=username, email=email, password=password)
+
+                # Sync role into Django auth groups (permissions rely on this)
+                user.groups.clear()
+                if role is not None:
+                    user.groups.add(role)
+
+                # Create Employee
+                Employee.objects.create(
+                    username=username,
+                    email=email,
+                    contact=contact,
+                    password=password,
+                    status=status,
+                    role=role,
+                    user=user
+                )
+        except IntegrityError:
+            messages.error(request, "Could not create employee (duplicate or invalid data).")
+            return render(request, 'users/employee_create.html', {
+                'title': 'Register Employee',
+                'roles': roles,
+            })
+
+        messages.success(request, f"Employee '{username}' created successfully.")
         return redirect('employee_list')
 
-    # GET request → send roles to template
-    roles = Group.objects.all()
     return render(request, 'users/employee_create.html', {  # <-- updated path
         'title': 'Register Employee',
         'roles': roles
