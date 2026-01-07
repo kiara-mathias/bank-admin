@@ -1,0 +1,602 @@
+{% extends 'users/base.html' %}
+
+{% block navbar_actions_left %}
+<div class="navbar-account-wrapper">
+
+    <!-- LEFT: User info -->
+    <div class="navbar-user">
+        <span class="user-name">{{ user.username }}</span>
+        <span class="user-email">
+            <i class="bi bi-envelope"></i> {{ user.email }}
+        </span>
+         <span class="account-no">
+            <i class="bi bi-credit-card"></i> {{ account.account_no }}
+        </span>
+    </div>
+    </div>
+
+    {% endblock %}
+
+    {% block navbar_actions_right %}
+    <!-- RIGHT: Account info -->
+    <div class="navbar-balance">
+        <span class="balance-label">Balance:</span>
+        <strong class="balance-amount">₹{{ account.current_balance }}</strong>
+       
+    </div>
+
+
+
+
+{% endblock %}
+
+
+{% block content %}
+<div class="account-container">
+
+    <!-- ===== TRANSACTIONS ===== -->
+    <div class="transaction-section">
+        
+        <div class="section-header">
+            <div>
+                <h3>Transaction History</h3>
+            </div>
+            
+
+            <!-- FILTER FORM -->
+            <form method="get" class="filter-form">
+                <select name="filter" id="filterSelect">
+                    <option value="">All</option>
+                    <option value="this_month" {% if filter_value == 'this_month' %}selected{% endif %}>This Month</option>
+                    <option value="3months" {% if filter_value == '3months' %}selected{% endif %}>Last 3 Months</option>
+                    <option value="6months" {% if filter_value == '6months' %}selected{% endif %}>Last 6 Months</option>
+                    <option value="1year" {% if filter_value == '1year' %}selected{% endif %}>Last 1 Year</option>
+                    <option value="custom" {% if filter_value == 'custom' %}selected{% endif %}>Custom</option>
+                </select>
+
+                <div id="customDates" class="custom-dates"
+                     style="{% if filter_value == 'custom' %}display:flex{% else %}display:none{% endif %}">
+                    <label>From</label>
+                    <input type="date" name="start_date" value="{{ start_date }}">
+                    <label>To</label>
+                    <input type="date" name="end_date" value="{{ end_date }}">
+                </div>
+
+                <button type="submit" class="btn btn-sm btn-secondary">Apply</button>
+            </form>
+            <div class="action-buttons">
+                {% if user.account.account_status == 'ACTIVE' %}
+    <a href="{% url 'make_transaction' user.pk %}" class="btn btn-success">
+        <i class="bi bi-plus-circle"></i> New Transaction
+    </a>
+{% else %}
+    <button class="btn btn-secondary" disabled title="Account {{ user.account.account_status|title }}">
+        <i class="bi bi-lock-fill"></i> New Transaction
+    </button>
+{% endif %}
+
+                <a href="{% url 'download_account_pdf' user_id=user.pk %}?filter={{ filter_value }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">
+                    <i class="bi bi-download"></i> Download PDF
+                </a>
+            </div>
+
+            <span class="transaction-count">{{ transactions|length }} transactions</span>
+        </div>
+
+        <div class="table-container">
+            <table class="transaction-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Balance</th>
+                        <th>Date & Time</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for txn in transactions %}
+                    <tr>
+                        <td>
+                            <span class="badge {% if txn.txn_type|lower == 'deposit' %}badge-success{% else %}badge-danger{% endif %}">
+                                {{ txn.txn_type }}
+                            </span>
+                        </td>
+                        <td class="{% if txn.txn_type|lower == 'deposit' %}text-success{% else %}text-danger{% endif %}">
+                            ₹{{ txn.amount }}
+                        </td>
+                        <td>₹{{ txn.current_balance }}</td>
+                        <td>{{ txn.txn_datetime }}</td>
+                        <td>{{ txn.description }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center">
+                            <div class="empty-state">
+                                <i class="bi bi-inbox"></i>
+                                <p>No transactions found</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<!-- ===== JS ===== -->
+<script>
+  const filterSelect = document.getElementById("filterSelect");
+  const customDates = document.getElementById("customDates");
+
+  filterSelect.addEventListener("change", function () {
+    customDates.style.display = this.value === "custom" ? "flex" : "none";
+  });
+</script>
+
+<!-- ===== STYLES ===== -->
+<style>
+@import url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css');
+
+.account-container {
+    max-width: 1200px;
+    margin: 1rem auto;
+    padding: 1rem;
+}
+
+.filter-form {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-form select,
+.filter-form input {
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid #ced4da;
+    font-size: 0.85rem;
+}
+
+.custom-dates {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    margin-top: 10px;
+}
+
+/* ========== COMPACT HEADER LAYOUT ========== */
+.account-header {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+
+/* Balance Section */
+.balance-section {
+    background: linear-gradient(135deg, #667eea 0%, #93f46f 100%);
+    color: white;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.balance-group {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.balance-label {
+    font-size: 0.875rem;
+    opacity: 0.9;
+    font-weight: 500;
+}
+
+.balance-amount {
+    font-size: 2rem;
+    font-weight: bold;
+    margin: 0;
+    line-height: 1;
+}
+
+.meta-item {
+    font-size: 0.875rem;
+    opacity: 0.95;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.meta-item i {
+    font-size: 1rem;
+}
+
+/* User Section */
+.user-section {
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.user-info {
+    flex: 1;
+    min-width: 200px;
+}
+
+.user-name {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.25rem;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.user-email {
+    margin: 0;
+    color: #6c757d;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.user-email i {
+    font-size: 0.85rem;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+}
+
+.btn-sm {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.85rem;
+}
+
+/* ========== TRANSACTION SECTION ========== */
+.transaction-section {
+    background: white;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.section-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.transaction-count {
+    font-size: 0.875rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+/* Table */
+.table-container {
+    overflow-x: auto;
+}
+
+.transaction-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.transaction-table thead {
+    background: linear-gradient(135deg, #667eea 0%, #93f46f 100%);
+    color: white;
+}
+
+.transaction-table th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.transaction-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f1f3f5;
+    font-size: 0.9rem;
+}
+
+.transaction-table tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.transaction-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* Badges */
+.badge {
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.badge-success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.badge-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+/* Text Colors */
+.text-success {
+    color: #28a745;
+}
+
+.text-danger {
+    color: #dc3545;
+}
+
+.text-center {
+    text-align: center;
+}
+
+/* Empty State */
+.empty-state {
+    padding: 2rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    color: #dee2e6;
+}
+
+.empty-state p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 1rem;
+}
+
+/* ========== RESPONSIVE DESIGN ========== */
+@media (max-width: 992px) {
+    .balance-section {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .balance-group {
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .account-container {
+        padding: 0.75rem;
+        margin: 0.5rem auto;
+    }
+
+    .balance-section {
+        padding: 1rem;
+    }
+
+    .balance-group {
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .balance-amount {
+        font-size: 1.75rem;
+    }
+
+    .user-section {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 1rem;
+    }
+
+    .user-info {
+        width: 100%;
+    }
+
+    .action-buttons {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .transaction-section {
+        padding: 1rem;
+    }
+
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .transaction-table {
+        font-size: 0.85rem;
+    }
+
+    .transaction-table th,
+    .transaction-table td {
+        padding: 0.6rem 0.5rem;
+    }
+
+    .badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .balance-group {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .balance-amount {
+        font-size: 1.5rem;
+    }
+
+    .meta-item {
+        font-size: 0.8rem;
+    }
+
+    .user-name {
+        font-size: 1.1rem;
+    }
+
+    .transaction-table th,
+    .transaction-table td {
+        padding: 0.5rem 0.4rem;
+        font-size: 0.8rem;
+    }
+}
+/* ===== NAVBAR WRAPPER ===== */
+.navbar-account-wrapper {
+    width: 100%;
+    display: flex;
+    justify-content: space-between; /* LEFT + RIGHT */
+    align-items: center;
+    padding: 0 1rem;
+    font-size: 0.85rem;
+}
+
+/* ===== LEFT: USER INFO ===== */
+.navbar-user {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #f1f1f1;
+    white-space: nowrap;
+}
+
+.user-name {
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.user-email {
+    color: #b5b5b5;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+/* ===== RIGHT: ACCOUNT INFO ===== */
+.navbar-balance {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: #f1f1f1;
+    white-space: nowrap;
+}
+
+.balance-label {
+    color: #b5b5b5;
+}
+
+.balance-amount {
+    font-weight: 600;
+    color: #4cd964; /* readable green on black */
+}
+
+.account-no {
+    color: #b5b5b5;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+/* Icons */
+.navbar-account-wrapper i {
+    font-size: 0.85rem;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .user-email,
+    .account-no {
+        display: none;
+    }
+}
+
+</style>
+
+{% endblock %}

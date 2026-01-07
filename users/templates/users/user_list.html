@@ -1,0 +1,744 @@
+{% extends 'users/base.html' %}
+{% block navbar_actions_left %}
+<a class="navbar-brand" href="{% url 'user_list' %}">Users Management</a>
+{% endblock %}
+{% block navbar_actions_right %}
+<a href="{% url 'employee_list' %}" class="btn btn-info">
+    <i class="bi bi-people"></i> Employees
+</a>
+<a href="{% url 'employee_create' %}" class="btn btn-primary">
+    <i class="bi bi-person-plus"></i> Register Employee
+</a>
+    <a href="{% url 'user_create' %}" class="btn-primary-custom">
+        <i class="bi bi-plus-circle"></i> Add User
+    </a>
+    {% endblock %}
+
+{% block content %}
+ 
+<div class="dashboard-container">
+    
+   <!-- SEARCH & FILTER SECTION  -->
+    <div class="search-filter-section">
+        <div class="search-wrapper">
+            <i class="bi bi-search search-icon"></i>
+            <input 
+                type="text"
+                id="live-search"
+                class="search-input"
+                placeholder="Search by username, email, contact, or account number..."
+            >
+        </div>
+        
+    </div>
+
+   <!-- USERS TABLE  -->
+    <div class="table-card">
+        <div class="table-wrapper">
+            <table class="users-table">
+                <thead>
+                    <tr>
+                        <th>
+                            <div class="th-content">
+                                <i class="bi bi-person-circle"></i>
+                                <span>Username</span>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="th-content">
+                                <i class="bi bi-credit-card-2-front"></i>
+                                <span>Account No.</span>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="th-content">
+                                <i class="bi bi-shield-check"></i>
+                                <span>Status</span>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="th-content">
+                                <i class="bi bi-file-earmark-check"></i>
+                                <span>KYC</span>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="th-content">
+                                <i class="bi bi-calendar-check"></i>
+                                <span>Joined</span>
+                            </div>
+                        </th>
+                        
+                        <th class="actions-column">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody id="users-table-body">
+                    {% for user in page_obj %}
+                    <tr class="user-row">
+                        <td>
+                            <a href="{% url 'user_account_info' user.pk %}" class="user-link">
+                                {{ user.username }}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="account-number">
+                                {{ user.account.account_no|default:"N/A" }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if user.account %}
+                            <form method="post" action="{% url 'update_account_status' user.account.id %}" class="inline-form">
+                                {% csrf_token %}
+                                <select name="account_status" onchange="this.form.submit()" class="status-select status-{{ user.account.account_status }}">
+                                    {% for key, label in user.account.STATUS_CHOICES %}
+                                        <option value="{{ key }}" {% if user.account.account_status == key %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.account %}
+                            <form method="post" action="{% url 'update_kyc_status' user.account.id %}" class="inline-form">
+                                {% csrf_token %}
+                                <select name="kyc_status" onchange="this.form.submit()" class="kyc-select kyc-{{ user.account.kyc_status }}">
+                                    {% for key, label in user.account.KYC_CHOICES %}
+                                        <option value="{{ key }}" {% if user.account.kyc_status == key %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="date-text">
+                                {{ user.joining_date }}
+                            </span>
+                        </td>
+                        
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{% url 'user_update' user.pk %}" 
+                                   class="action-btn edit-btn"
+                                   title="Edit User">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'user_delete' user.pk %}" 
+                                   class="action-btn delete-btn"
+                                   title="Delete User">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <div class="empty-content">
+                                <i class="bi bi-inbox"></i>
+                                <p>No users found</p>
+                                <a href="{% url 'user_create' %}" class="btn-primary-custom">
+                                    <i class="bi bi-plus-circle"></i> Create First User
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ================= PAGINATION ================= -->
+        {% if page_obj.has_other_pages %}
+        <div class="pagination-wrapper">
+            <nav>
+                <ul class="pagination-list">
+                    {% if page_obj.has_previous %}
+                        <li>
+                            <a class="pagination-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}">
+                                <i class="bi bi-chevron-left"></i> Previous
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li>
+                                <span class="pagination-link active">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li>
+                                <a class="pagination-link" href="?page={{ num }}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li>
+                            <a class="pagination-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}">
+                                Next <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- FILTER & LIVE SEARCH SCRIPT -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const searchInput = document.getElementById('live-search');
+    const dateFilter = document.getElementById('date-filter');
+    const tableBody = document.getElementById('users-table-body');
+
+    // Handle date filter change
+    if (dateFilter) {
+        dateFilter.addEventListener('change', function() {
+            const filterValue = this.value;
+            const currentUrl = new URL(window.location.href);
+            
+            if (filterValue === 'all') {
+                currentUrl.searchParams.delete('filter');
+            } else {
+                currentUrl.searchParams.set('filter', filterValue);
+            }
+            
+            // Reset to page 1 when filtering
+            currentUrl.searchParams.delete('page');
+            
+            window.location.href = currentUrl.toString();
+        });
+    }
+
+    // Live search functionality
+    if (searchInput && tableBody) {
+        searchInput.addEventListener('keyup', function () {
+            const query = this.value.trim();
+
+            fetch(`/users/live-search/?q=${query}`)
+                .then(response => response.json())
+                .then(data => {
+                    tableBody.innerHTML = '';
+
+                    if (data.results.length === 0) {
+                        tableBody.innerHTML = `
+                            <tr>
+                                <td colspan="6" class="empty-state">
+                                    <div class="empty-content">
+                                        <i class="bi bi-inbox"></i>
+                                        <p>No users match your search</p>
+                                    </div>
+                                </td>
+                            </tr>`;
+                        return;
+                    }
+
+                    data.results.forEach(user => {
+                        tableBody.innerHTML += `
+                            <tr class="user-row">
+                                <td>
+                                    <a href="/users/${user.id}/accounts/" class="user-link">
+                                        ${highlight(user.username, query)}
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="account-number">
+                                        ${highlight(user.account_no, query)}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="status-badge">${user.account_status || 'N/A'}</span>
+                                </td>
+                                <td>
+                                    <span class="kyc-badge">${user.kyc_status || 'N/A'}</span>
+                                </td>
+                                <td>
+                                    <span class="date-text">${user.joining_date}</span>
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <a href="/users/update/${user.id}/" class="action-btn edit-btn" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <a href="/users/delete/${user.id}/" class="action-btn delete-btn" title="Delete">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>`;
+                    });
+                })
+                .catch(err => console.error("Search error:", err));
+        });
+    }
+
+    function highlight(text, query) {
+        if (!query) return text;
+        text = String(text);
+        const regex = new RegExp(`(${query})`, 'gi');
+        return text.replace(regex, `<mark>$1</mark>`);
+    }
+});
+</script>
+
+<!-- STYLE -->
+<style>
+    @import url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css');
+
+    /* ========== GENERAL DASHBOARD STYLES - COMPACT ========== */
+    .dashboard-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 1.25rem;
+        background-color: #f8f9fa;
+        min-height: 100vh;
+    }
+
+    /* ========== PRIMARY BUTTON - COMPACT ========== */
+    .btn-primary-custom {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: linear-gradient(135deg, #667eea 0%, #7eee62 100%);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+        border: none;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        white-space: nowrap;
+    }
+
+    .btn-primary-custom:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    /* ========== COMPACT SEARCH & FILTER SECTION ========== */
+    .search-filter-section {
+        margin-bottom: 0.875rem;
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+    }
+    
+    .search-wrapper {
+        position: relative;
+        flex: 0 0 50%;
+        min-width: 100px;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 0.7rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+        font-size: 0.95rem;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 0.5rem 0.7rem 0.5rem 2.3rem;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        background-color: white;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+    }
+
+    .search-input::placeholder {
+        color: #adb5bd;
+    }
+
+    /* ========== COMPACT TABLE CARD ========== */
+    .table-card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+    }
+
+    /* ========== COMPACT TABLE STYLES ========== */
+    .users-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .users-table thead {
+        background: linear-gradient(135deg, #667eea 0%, #8eef5a 100%);
+        color: white;
+    }
+
+    .users-table thead th {
+        padding: 0.6rem 0.7rem;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        border: none;
+        white-space: nowrap;
+    }
+
+    .th-content {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .actions-column {
+        text-align: center;
+    }
+
+    .users-table tbody tr {
+        border-bottom: 1px solid #f1f3f5;
+        transition: background-color 0.15s ease;
+    }
+
+    .users-table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .users-table tbody td {
+        padding: 0.5rem 0.7rem;
+        vertical-align: middle;
+        color: #495057;
+        font-size: 0.875rem;
+    }
+
+    /* ========== INLINE FORMS ========== */
+    .inline-form {
+        margin: 0;
+        padding: 0;
+    }
+
+    /* ========== COMPACT STATUS SELECT ========== */
+    .status-select {
+        padding: 0.25rem 0.4rem;
+        border: 1px solid;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background-color: white;
+        min-width: 85px;
+        max-width: 100px;
+    }
+
+    .status-select:focus {
+        outline: none;
+        box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.2);
+    }
+
+    .status-select:hover {
+        opacity: 0.85;
+    }
+
+    /* Status: ACTIVE (Green) */
+    .status-select.status-ACTIVE {
+        background-color: #d4edda;
+        color: #155724;
+        border-color: #28a745;
+    }
+
+    /* Status: FROZEN (Yellow) */
+    .status-select.status-FROZEN {
+        background-color: #fff3cd;
+        color: #856404;
+        border-color: #ffc107;
+    }
+
+    /* Status: CLOSED (Red) */
+    .status-select.status-CLOSED {
+        background-color: #f8d7da;
+        color: #721c24;
+        border-color: #dc3545;
+    }
+
+    /* ========== COMPACT KYC SELECT ========== */
+    .kyc-select {
+        padding: 0.25rem 0.4rem;
+        border: 1px solid;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background-color: white;
+        min-width: 90px;
+        max-width: 120px;
+    }
+
+    .kyc-select:focus {
+        outline: none;
+        box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.2);
+    }
+
+    .kyc-select:hover {
+        opacity: 0.85;
+    }
+
+    /* KYC: VERIFIED (Green) */
+    .kyc-select.kyc-VERIFIED {
+        background-color: #d4edda;
+        color: #155724;
+        border-color: #28a745;
+    }
+
+    /* KYC: PENDING (Yellow) */
+    .kyc-select.kyc-PENDING {
+        background-color: #fff3cd;
+        color: #856404;
+        border-color: #ffc107;
+    }
+
+    /* KYC: REJECTED (Red) */
+    .kyc-select.kyc-REJECTED {
+        background-color: #f8d7da;
+        color: #721c24;
+        border-color: #dc3545;
+    }
+
+    /* KYC: NOT_SUBMITTED (Gray) */
+    .kyc-select.kyc-NOT_SUBMITTED {
+        background-color: #e9ecef;
+        color: #495057;
+        border-color: #6c757d;
+    }
+
+    /* ========== DATE TEXT ========== */
+    .date-text {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+
+    /* ========== TEXT MUTED ========== */
+    .text-muted {
+        color: #6c757d;
+        font-style: italic;
+    }
+
+    /* ========== COMPACT USER INFO ========== */
+    .user-link {
+        color: #2c3e50;
+        font-weight: 600;
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+
+    .user-link:hover {
+        color: #667eea;
+        text-decoration: underline;
+    }
+
+    /* ========== SUBTLE ACCOUNT NUMBER ========== */
+    .account-number {
+        display: inline-block;
+        padding: 0.2rem 0.5rem;
+        background-color: #f8f9fa;
+        color: #6c757d;
+        border-radius: 4px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.8rem;
+        font-weight: 500;
+        border: 1px solid #e9ecef;
+    }
+
+    /* ========== REFINED ACTION BUTTONS ========== */
+    .action-buttons {
+        display: flex;
+        gap: 0.35rem;
+        justify-content: center;
+    }
+
+    .action-btn {
+        width: 26px;
+        height: 26px;
+        border-radius: 5px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        border: none;
+        cursor: pointer;
+        font-size: 0.8rem;
+    }
+
+    /* Muted Edit Button */
+    .edit-btn {
+        background-color: #f8f9fa;
+        color: #6c757d;
+        border: 1px solid #e9ecef;
+    }
+
+    .edit-btn:hover {
+        background-color: #fff3e0;
+        color: #f57c00;
+        border-color: #ffe0b2;
+    }
+
+    /* Prominent Delete Button */
+    .delete-btn {
+        background-color: #ffebee;
+        color: #d32f2f;
+        border: 1px solid #ffcdd2;
+    }
+
+    .delete-btn:hover {
+        background-color: #d32f2f;
+        color: white;
+        border-color: #d32f2f;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(211, 47, 47, 0.3);
+    }
+
+    /* ========== COMPACT EMPTY STATE ========== */
+    .empty-state {
+        padding: 2.5rem 1.5rem !important;
+        text-align: center;
+    }
+
+    .empty-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .empty-content i {
+        font-size: 3rem;
+        color: #dee2e6;
+    }
+
+    .empty-content p {
+        color: #6c757d;
+        font-size: 1rem;
+        margin: 0;
+    }
+
+    /* ========== COMPACT PAGINATION ========== */
+    .pagination-wrapper {
+        padding: 0.65rem 1rem;
+        border-top: 1px solid #f1f3f5;
+        background-color: #fafbfc;
+    }
+
+    .pagination-list {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.35rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .pagination-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.35rem 0.65rem;
+        border-radius: 5px;
+        text-decoration: none;
+        color: #495057;
+        background-color: white;
+        border: 1px solid #dee2e6;
+        font-weight: 500;
+        font-size: 0.85rem;
+        transition: all 0.2s ease;
+    }
+
+    .pagination-link:hover {
+        background-color: #f8f9fa;
+        border-color: #667eea;
+        color: #667eea;
+    }
+
+    .pagination-link.active {
+        background: linear-gradient(135deg, #667eea 0%, #aefa6c 100%);
+        color: white;
+        border-color: transparent;
+    }
+
+    /* ========== HIGHLIGHT MARK ========== */
+    mark {
+        background-color: #fff3cd;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-weight: 600;
+    }
+
+    /* ========== RESPONSIVE DESIGN ========== */
+    @media (max-width: 768px) {
+        .dashboard-container {
+            padding: 1rem;
+        }
+
+        .search-filter-section {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .search-wrapper {
+            max-width: 100%;
+            min-width: 100%;
+        }
+
+        .users-table {
+            font-size: 0.8rem;
+        }
+
+        .users-table thead th,
+        .users-table tbody td {
+            padding: 0.45rem 0.4rem;
+        }
+
+        .status-select,
+        .kyc-select {
+            font-size: 0.7rem;
+            min-width: 80px;
+            padding: 0.2rem 0.3rem;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .action-btn {
+            width: 24px;
+            height: 24px;
+        }
+    }
+</style>
+
+{% endblock %}

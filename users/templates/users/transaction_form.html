@@ -1,0 +1,74 @@
+{% extends 'users/base.html' %}
+
+{% block content %}
+<div class="container mt-3" style="max-width: 500px;">
+
+    <!-- Balance Card -->
+    <div class="balance-box mb-3 text-center">
+        <p class="balance-label">Current Balance</p>
+        <h3 class="balance-amount">₹{{ current_balance }}</h3>
+    </div>
+
+    <!-- Form Card -->
+    <form method="post" class="card p-4 shadow-sm rounded-3 border-0">
+        {% csrf_token %}
+
+        {% for field in form %}
+            <div class="mb-3">
+                <label class="form-label fw-semibold">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                    <div class="text-danger small mt-1">
+                        {{ field.errors|striptags }}
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        <!-- Actions -->
+        <div class="d-flex gap-3 mt-4">
+            <button type="submit" class="btn btn-success flex-fill">
+                Submit
+            </button>
+            <a href="{% url 'user_account_info' user.pk %}" class="btn btn-outline-secondary flex-fill">
+                Cancel
+            </a>
+        </div>
+    </form>
+
+</div>
+
+<style>
+    /* Balance box */
+    .balance-box {
+        background: linear-gradient(135deg, #667eea, #a5ea65);
+        color: white;
+        padding: 1rem 1.25rem;
+        border-radius: 12px;
+    }
+
+    .balance-label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin: 0 0 0.25rem 0;
+        opacity: 0.95;
+    }
+
+    .balance-amount {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    /* Form inputs */
+    input, select, textarea {
+        border-radius: 8px !important;
+    }
+
+    /* Buttons */
+    .btn {
+        border-radius: 8px;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}

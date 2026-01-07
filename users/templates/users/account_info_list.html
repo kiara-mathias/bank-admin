@@ -1,0 +1,36 @@
+{% extends 'users/base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Accounts List</h2>
+    <a href="{% url 'account_info_create' %}" class="btn btn-primary">Add Account</a>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Account Number</th>
+            <th>User</th>
+            <th>Current Balance</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for acc in accounts %}
+        <tr>
+            <td>{{ acc.account_no }}</td>
+            <td>{{ acc.user.username }} ({{ acc.user.email }})</td>
+            <td>{{ acc.current_balance }}</td>
+            <td>
+                <a href="{% url 'account_info_update' acc.pk %}" class="btn btn-sm btn-warning">Edit</a>
+                <a href="{% url 'account_info_delete' acc.pk %}" class="btn btn-sm btn-danger">Delete</a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="4" class="text-center">No accounts found</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

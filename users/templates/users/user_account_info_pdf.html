@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Account Statement - {{ user.username }}</title>
+    <style>
+        @page {
+            size: a4 portrait;
+            margin: 1.5cm;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            color: black;
+            font-size: 11pt;
+            margin: 0;
+            padding: 15px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 18pt;
+            margin: 0 0 5px 0;
+            padding: 0;
+            text-transform: uppercase;
+            color: #1a237e;
+            border-bottom: 3px solid #1a237e;
+            padding-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 9pt;
+            color: #555555;
+            margin: 0 0 20px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .info-table {
+            margin: 15px 0;
+            border: 1px solid #1a237e;
+        }
+
+        .info-table td {
+            padding: 6px 10px;
+            border: 1px solid #cccccc;
+            font-size: 10pt;
+        }
+
+        .info-table .label {
+            font-weight: bold;
+            width: 35%;
+            background-color: #e8eaf6;
+            color: #1a237e;
+        }
+
+        .info-table .value {
+            width: 65%;
+        }
+
+        .balance-row {
+            margin: 15px 0;
+        }
+
+        .balance-row table {
+            border: 2px solid #2e7d32;
+        }
+
+        .balance-row td {
+            padding: 8px 12px;
+            font-weight: bold;
+        }
+
+        .balance-row .label {
+            width: 60%;
+            background-color: #e8f5e9;
+            color: #1b5e20;
+            font-size: 10pt;
+        }
+
+        .balance-row .amount {
+            width: 40%;
+            text-align: right;
+            background-color: #e8f5e9;
+            color: #1b5e20;
+            font-size: 16pt;
+        }
+
+        h2 {
+            font-size: 13pt;
+            margin: 20px 0 10px 0;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #1a237e;
+            text-transform: uppercase;
+            color: #1a237e;
+        }
+
+        .transaction-table {
+            margin-top: 10px;
+            border: 1px solid #1a237e;
+        }
+
+        .transaction-table th {
+            background-color: #1a237e;
+            color: white;
+            padding: 8px 5px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 9pt;
+            text-transform: uppercase;
+            border: 1px solid #1a237e;
+        }
+
+        .transaction-table td {
+            padding: 6px 5px;
+            border: 1px solid #d0d0d0;
+            font-size: 10pt;
+        }
+
+        .transaction-table .odd-row {
+            background-color: #f5f5f5;
+        }
+
+        .transaction-table .even-row {
+            background-color: white;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .right {
+            text-align: right;
+        }
+
+        .deposit {
+            color: #2e7d32;
+            font-weight: bold;
+        }
+
+        .withdraw {
+            color: #c62828;
+            font-weight: bold;
+        }
+
+        .balance-col {
+            font-weight: bold;
+            color: #1565c0;
+        }
+
+        .empty-msg {
+            text-align: center;
+            padding: 25px;
+            color: #888888;
+            font-style: italic;
+        }
+
+        .footer {
+            margin-top: 25px;
+            padding-top: 12px;
+            border-top: 1px solid #cccccc;
+            text-align: center;
+            font-size: 8pt;
+            color: #666666;
+        }
+
+        .summary-box {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #fff3e0;
+            border: 1px solid #ff6f00;
+            border-left: 4px solid #ff6f00;
+        }
+
+        .summary-box p {
+            margin: 3px 0;
+            font-size: 9pt;
+        }
+    </style>
+</head>
+<body>
+    <h1>Account Statement</h1>
+    <p class="subtitle">Statement of Account Activity and Balance</p>
+
+    <table class="info-table">
+        <tr>
+            <td class="label">Account Holder</td>
+            <td class="value">{{ user.username }}</td>
+        </tr>
+        <tr>
+            <td class="label">Email Address</td>
+            <td class="value">{{ user.email }}</td>
+        </tr>
+        <tr>
+            <td class="label">Account Number</td>
+            <td class="value">{{ account.account_no }}</td>
+        </tr>
+    </table>
+
+    <div class="balance-row">
+        <table>
+            <tr>
+                <td class="label">CURRENT BALANCE:</td>
+                <td class="amount">Rs. {{ account.current_balance }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <h2>Transaction History</h2>
+
+    <table class="transaction-table">
+        <thead>
+            <tr>
+                <th class="center" width="7%">S.No</th>
+                <th width="19%">Date &amp; Time</th>
+                <th width="13%">Type</th>
+                <th width="28%">Description</th>
+                <th class="right" width="16%">Amount (Rs.)</th>
+                <th class="right" width="17%">Balance (Rs.)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for txn in transactions %}
+            <tr class="{% cycle 'odd-row' 'even-row' %}">
+                <td class="center">{{ forloop.counter }}</td>
+                <td>{{ txn.txn_datetime }}</td>
+                <td class="{{ txn.txn_type }}">{{ txn.txn_type|title }}</td>
+                <td>{{ txn.description|default:"-" }}</td>
+                <td class="right">{{ txn.amount }}</td>
+                <td class="right balance-col">{{ txn.current_balance }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="empty-msg">
+                    No transactions available for this period
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <p>Generated on: {% now "F d, Y" %}</p>
+    </div>
+</body>
+</html>

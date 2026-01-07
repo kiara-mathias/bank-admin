@@ -1,0 +1,60 @@
+{% extends 'users/base.html' %}
+
+{% block title %}Register Employee{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    
+    <div class="form-header">
+        <h2 class="form-title">{{ title }}</h2>
+    </div>
+
+    <div class="form-card">
+        <form method="POST">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                <input type="text" name="username" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Contact</label>
+                <input type="text" name="contact" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-control">
+                    <option value="ACTIVE">Active</option>
+                    <option value="FROZEN">Frozen</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Role</label>
+                <select name="role" class="form-control">
+                    <option value="">Select Role</option>
+                    {% for role in roles %}
+                        <option value="{{ role.id }}">{{ role.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-success">Save</button>
+            <a href="{% url 'employee_list' %}" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

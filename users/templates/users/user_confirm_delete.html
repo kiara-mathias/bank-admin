@@ -1,0 +1,61 @@
+{% extends 'users/base.html' %}
+
+{% block content %}
+<div class="form-container">
+<h2 class="form-title">Delete User</h2>
+
+<p class="form-subtitle">Are you sure you want to delete <strong>{{ username.name }}</strong>?</p>
+
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Yes, Delete</button>
+    <a href="{% url 'user_list' %}" class="btn btn-secondary">Cancel</a>
+</form>
+</div>
+<style>
+    .form-container {
+        max-width: 600px;
+        margin: 2rem auto;
+        padding: 1rem;
+        background-color: #f8f9fa;
+    }
+    .form-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+    .form-subtitle {
+        color: #6c757d;
+        margin-bottom: 1.5rem;
+    }
+    .btn-danger {
+        background-color: #f3061e;
+        color: #f8f9fa;
+        padding: 0.65rem 1.0rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+    }   
+    .btn-danger:hover {
+        background-color: #a20000;
+        color: #f8f9fa;
+    }
+    .btn-secondary {
+        background-color: #6c757d;
+        color: #f8f9fa;
+        padding: 0.65rem 1.0rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+    }
+
+</style>
+
+{% endblock %}
