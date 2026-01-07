@@ -13,7 +13,7 @@ from decimal import Decimal
 from xhtml2pdf import pisa
 
 from .models import UsersNew, Account, Transaction, Employee
-from .forms import UsersNewForm, AccountInfoForm, TransactionForm, EmployeeForm
+from .forms import UsersNewForm, AccountInfoForm, TransactionForm, EmployeeForm, EmployeeCreationForm
 
 
 # ========== PERMISSION HELPERS ==========
@@ -94,86 +94,25 @@ def employee_list(request):
 @login_required
 @user_passes_test(is_manager)
 def employee_create(request):
-    roles = Group.objects.all()
-
     if request.method == 'POST':
-        # Grab form data manually
-        username = (request.POST.get('username') or '').strip()
-        email = (request.POST.get('email') or '').strip()
-        contact = (request.POST.get('contact') or '').strip()
-        password = request.POST.get('password') or ''
-        status = request.POST.get('status', 'ACTIVE')
-        role_id = (request.POST.get('role') or '').strip()
-
-        # Basic validation
-        if not username or not email or not contact or not password:
-            messages.error(request, "Please fill in all required fields.")
-            return render(request, 'users/employee_create.html', {
-                'title': 'Register Employee',
-                'roles': roles,
-            })
-
-        if User.objects.filter(username=username).exists():
-            messages.error(request, f"Username '{username}' is already taken.")
-            return render(request, 'users/employee_create.html', {
-                'title': 'Register Employee',
-                'roles': roles,
-            })
-
-        if Employee.objects.filter(email=email).exists():
-            messages.error(request, f"Email '{email}' is already registered for an employee.")
-            return render(request, 'users/employee_create.html', {
-                'title': 'Register Employee',
-                'roles': roles,
-            })
-
-        # Assign role if selected (else default to Clerk if it exists)
-        role = None
-        if role_id:
-            role = Group.objects.filter(pk=role_id).first()
-            if role is None:
-                messages.error(request, "Selected role is invalid.")
-                return render(request, 'users/employee_create.html', {
-                    'title': 'Register Employee',
-                    'roles': roles,
-                })
+        form = EmployeeCreationForm(request.POST)
+        if form.is_valid():
+            try:
+                employee = form.save()
+                messages.success(request, f"Employee '{employee.username}' created successfully.")
+                return redirect('employee_list')
+            except IntegrityError:
+                messages.error(request, "Could not create employee. Possible duplicate data.")
         else:
-            role = Group.objects.filter(name='Clerk').first()
+             messages.error(request, "Please correct the errors below.")
+    else:
+        form = EmployeeCreationForm()
 
-        try:
-            with transaction.atomic():
-                # Create Django User
-                user = User.objects.create_user(username=username, email=email, password=password)
-
-                # Sync role into Django auth groups (permissions rely on this)
-                user.groups.clear()
-                if role is not None:
-                    user.groups.add(role)
-
-                # Create Employee
-                Employee.objects.create(
-                    username=username,
-                    email=email,
-                    contact=contact,
-                    password=password,
-                    status=status,
-                    role=role,
-                    user=user
-                )
-        except IntegrityError:
-            messages.error(request, "Could not create employee (duplicate or invalid data).")
-            return render(request, 'users/employee_create.html', {
-                'title': 'Register Employee',
-                'roles': roles,
-            })
-
-        messages.success(request, f"Employee '{username}' created successfully.")
-        return redirect('employee_list')
-
-    return render(request, 'users/employee_create.html', {  # <-- updated path
+    return render(request, 'users/employee_create.html', {
         'title': 'Register Employee',
-        'roles': roles
+        'form': form
     })
+
 @login_required
 def employee_update(request, pk):
     """Update employee info; Clerks can only edit themselves"""
@@ -201,12 +140,11 @@ def employee_update(request, pk):
 
                 # Only manager can change role
                 if is_manager(request.user):
-                    role_name = form.cleaned_data.get('role_name')
-                    if role_name:
+                    role = form.cleaned_data.get('role')
+                    if role:
                         emp.user.groups.clear()
-                        emp.user.groups.add(role_name)
-                        emp.role = role_name
-                        emp.save()
+                        emp.user.groups.add(role)
+                        # emp.role is already updated by form.save()
 
                 emp.user.save()
 
@@ -215,12 +153,10 @@ def employee_update(request, pk):
     else:
         form = EmployeeForm(instance=emp)
 
-    available_roles = Group.objects.all()
     return render(request, 'users/employee_form.html', {
         'form': form,
         'title': 'Update Employee',
         'employee': emp,
-        'available_roles': available_roles,
     })
 
 
