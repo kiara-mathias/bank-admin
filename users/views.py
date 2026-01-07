@@ -64,14 +64,23 @@ def custom_login(request):
         if user is not None:
             # Check if user has the selected role
             if role:
-                if not user.groups.filter(name=role).exists() and not user.is_superuser:
-                    messages.error(request, f"Access Denied: You are not assigned the role '{role}'.")
-                    return render(request, 'users/login.html')
+                # If user is SUPERUSER, they can log in as ANY role (Admin/Manager/Supervisor/Clerk)
+                # If user is NORMAL, they must have the specific group assigned
+                if not user.is_superuser:
+                    if not user.groups.filter(name=role).exists():
+                        messages.error(request, f"Access Denied: You are not assigned the role '{role}'.")
+                        return render(request, 'users/login.html')
             
             if user.is_active:
                 login(request, user)
                 
                 # Redirect based on role
+                # Superuser -> Employee List by default (Manager View) or User List if they chose Supervisor/Clerk
+                if user.is_superuser:
+                    if role == 'Supervisor' or role == 'Clerk':
+                        return redirect('user_list')
+                    return redirect('employee_list') # Default for Admin/Manager selection
+
                 if is_manager(user):
                     return redirect('employee_list')
                 elif is_supervisor(user) or is_clerk(user):
@@ -362,6 +371,7 @@ def user_list(request):
         'query': query,
         'is_supervisor': can_manage_customers(request.user), # For UI logic
         'is_clerk': is_clerk(request.user),
+        'is_manager': can_manage_employees(request.user), # For Employee Link
     })
 
 
