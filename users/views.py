@@ -4,6 +4,7 @@ from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Q
+from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse, HttpResponse
@@ -36,15 +37,6 @@ def can_manage_employees(user):
 
 def can_view_customers(user):
     """Supervisors and Clerks can view customers (Managers too, optionally)"""
-    # Allowing Managers to view customers too, as they are likely admins.
-    # But strictly based on prompt: "clerk... user dashboard... supervisor... users transactions"
-    # Prompt says: "managers shld not be able to do what its doing currently" -> Refers to "Currently they see everything".
-    # I will allow Managers to see customers but NOT make transactions, to keep them as "HR".
-    # Wait, if Manager is HR, they don't need to see Bank Customers.
-    # Let's try STRICT separation.
-    # Manager -> Employees Only.
-    # Supervisor/Clerk -> Customers Only.
-    # Superuser -> Everything.
     if user.is_superuser: return True
     return user.groups.filter(name__in=['Supervisor', 'Clerk']).exists()
 
@@ -57,6 +49,50 @@ def can_make_transactions(user):
     """Only Supervisors can make transactions"""
     if user.is_superuser: return True
     return user.groups.filter(name='Supervisor').exists()
+
+
+# ========== AUTHENTICATION VIEWS ==========
+
+def custom_login(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        role = request.POST.get('role')
+
+        user = authenticate(request, username=username, password=password)
+        
+        if user is not None:
+            # Check if user has the selected role
+            if role:
+                # If user is SUPERUSER, they can log in as ANY role (Admin/Manager/Supervisor/Clerk)
+                # If user is NORMAL, they must have the specific group assigned
+                if not user.is_superuser:
+                    if not user.groups.filter(name=role).exists():
+                        messages.error(request, f"Access Denied: You are not assigned the role '{role}'.")
+                        return render(request, 'users/login.html')
+            
+            if user.is_active:
+                login(request, user)
+                
+                # Redirect based on role
+                # Superuser -> Employee List by default (Manager View) or User List if they chose Supervisor/Clerk
+                if user.is_superuser:
+                    if role == 'Supervisor' or role == 'Clerk':
+                        return redirect('user_list')
+                    return redirect('employee_list') # Default for Admin/Manager selection
+
+                if is_manager(user):
+                    return redirect('employee_list')
+                elif is_supervisor(user) or is_clerk(user):
+                    return redirect('user_list')
+                else:
+                    return redirect('user_list')
+            else:
+                messages.error(request, "Your account is disabled.")
+        else:
+            messages.error(request, "Invalid username or password.")
+            
+    return render(request, 'users/login.html')
 
 
 # ========== EMPLOYEE VIEWS (Manager Only) ==========
@@ -335,6 +371,7 @@ def user_list(request):
         'query': query,
         'is_supervisor': can_manage_customers(request.user), # For UI logic
         'is_clerk': is_clerk(request.user),
+        'is_manager': can_manage_employees(request.user), # For Employee Link
     })
 
 
