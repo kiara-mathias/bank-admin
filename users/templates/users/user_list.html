@@ -3,16 +3,21 @@
 <a class="navbar-brand" href="{% url 'user_list' %}">Users Management</a>
 {% endblock %}
 {% block navbar_actions_right %}
-<a href="{% url 'employee_list' %}" class="btn btn-info">
-    <i class="bi bi-people"></i> Employees
-</a>
-<a href="{% url 'employee_create' %}" class="btn btn-primary">
-    <i class="bi bi-person-plus"></i> Register Employee
-</a>
+    {% if is_manager %}
+    <a href="{% url 'employee_list' %}" class="btn btn-info">
+        <i class="bi bi-people"></i> Employees
+    </a>
+    <a href="{% url 'employee_create' %}" class="btn btn-primary">
+        <i class="bi bi-person-plus"></i> Register Employee
+    </a>
+    {% endif %}
+    
+    {% if is_supervisor %}
     <a href="{% url 'user_create' %}" class="btn-primary-custom">
         <i class="bi bi-plus-circle"></i> Add User
     </a>
-    {% endblock %}
+    {% endif %}
+{% endblock %}
 
 {% block content %}
  
@@ -88,32 +93,44 @@
                         </td>
                         <td>
                             {% if user.account %}
-                            <form method="post" action="{% url 'update_account_status' user.account.id %}" class="inline-form">
-                                {% csrf_token %}
-                                <select name="account_status" onchange="this.form.submit()" class="status-select status-{{ user.account.account_status }}">
-                                    {% for key, label in user.account.STATUS_CHOICES %}
-                                        <option value="{{ key }}" {% if user.account.account_status == key %}selected{% endif %}>
-                                            {{ label }}
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                            </form>
+                                {% if is_supervisor %}
+                                <form method="post" action="{% url 'update_account_status' user.account.id %}" class="inline-form">
+                                    {% csrf_token %}
+                                    <select name="account_status" onchange="this.form.submit()" class="status-select status-{{ user.account.account_status }}">
+                                        {% for key, label in user.account.STATUS_CHOICES %}
+                                            <option value="{{ key }}" {% if user.account.account_status == key %}selected{% endif %}>
+                                                {{ label }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </form>
+                                {% else %}
+                                    <span class="status-select status-{{ user.account.account_status }}" style="cursor: default;">
+                                        {{ user.account.get_account_status_display }}
+                                    </span>
+                                {% endif %}
                             {% else %}
                                 <span class="text-muted">N/A</span>
                             {% endif %}
                         </td>
                         <td>
                             {% if user.account %}
-                            <form method="post" action="{% url 'update_kyc_status' user.account.id %}" class="inline-form">
-                                {% csrf_token %}
-                                <select name="kyc_status" onchange="this.form.submit()" class="kyc-select kyc-{{ user.account.kyc_status }}">
-                                    {% for key, label in user.account.KYC_CHOICES %}
-                                        <option value="{{ key }}" {% if user.account.kyc_status == key %}selected{% endif %}>
-                                            {{ label }}
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                            </form>
+                                {% if is_supervisor %}
+                                <form method="post" action="{% url 'update_kyc_status' user.account.id %}" class="inline-form">
+                                    {% csrf_token %}
+                                    <select name="kyc_status" onchange="this.form.submit()" class="kyc-select kyc-{{ user.account.kyc_status }}">
+                                        {% for key, label in user.account.KYC_CHOICES %}
+                                            <option value="{{ key }}" {% if user.account.kyc_status == key %}selected{% endif %}>
+                                                {{ label }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </form>
+                                {% else %}
+                                    <span class="kyc-select kyc-{{ user.account.kyc_status }}" style="cursor: default;">
+                                        {{ user.account.get_kyc_status_display }}
+                                    </span>
+                                {% endif %}
                             {% else %}
                                 <span class="text-muted">N/A</span>
                             {% endif %}
@@ -126,6 +143,7 @@
                         
                         <td>
                             <div class="action-buttons">
+                                {% if is_supervisor %}
                                 <a href="{% url 'user_update' user.pk %}" 
                                    class="action-btn edit-btn"
                                    title="Edit User">
@@ -136,6 +154,9 @@
                                    title="Delete User">
                                     <i class="bi bi-trash"></i>
                                 </a>
+                                {% else %}
+                                <span class="text-muted" style="font-size: 0.8rem;">Read-only</span>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
@@ -145,9 +166,11 @@
                             <div class="empty-content">
                                 <i class="bi bi-inbox"></i>
                                 <p>No users found</p>
+                                {% if is_supervisor %}
                                 <a href="{% url 'user_create' %}" class="btn-primary-custom">
                                     <i class="bi bi-plus-circle"></i> Create First User
                                 </a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
@@ -202,6 +225,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const searchInput = document.getElementById('live-search');
     const dateFilter = document.getElementById('date-filter');
     const tableBody = document.getElementById('users-table-body');
+    const isSupervisor = {{ is_supervisor|yesno:"true,false" }};
 
     // Handle date filter change
     if (dateFilter) {
@@ -246,6 +270,18 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
 
                     data.results.forEach(user => {
+                        let actionsHtml = '<span class="text-muted" style="font-size: 0.8rem;">Read-only</span>';
+                        if (isSupervisor) {
+                            actionsHtml = `
+                                <a href="/users/update/${user.id}/" class="action-btn edit-btn" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="/users/delete/${user.id}/" class="action-btn delete-btn" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            `;
+                        }
+
                         tableBody.innerHTML += `
                             <tr class="user-row">
                                 <td>
@@ -269,12 +305,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 </td>
                                 <td>
                                     <div class="action-buttons">
-                                        <a href="/users/update/${user.id}/" class="action-btn edit-btn" title="Edit">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
-                                        <a href="/users/delete/${user.id}/" class="action-btn delete-btn" title="Delete">
-                                            <i class="bi bi-trash"></i>
-                                        </a>
+                                        ${actionsHtml}
                                     </div>
                                 </td>
                             </tr>`;
