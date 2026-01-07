@@ -1,0 +1,5 @@
+django==5.1.6
+django-widget-tweaks
+xhtml2pdf
+pytz
+psycopg2-binary
