@@ -289,7 +289,7 @@
             {% if form.errors %}
                 <div class="alert alert-danger">
                     <i class="bi bi-exclamation-circle-fill"></i>
-                    <span>Invalid username or password</span>
+                    <span>{{ form.non_field_errors.0|default:"Invalid credentials" }}</span>
                 </div>
             {% endif %}
 
@@ -327,6 +327,16 @@
                     </div>
                 </div>
 
+                <div class="form-group">
+                    <label class="form-label" for="id_role">Login As</label>
+                    <select name="role" id="id_role" class="form-control" required>
+                        <option value="">Select Role</option>
+                        <option value="Manager">Manager</option>
+                        <option value="Supervisor">Supervisor</option>
+                        <option value="Clerk">Clerk</option>
+                    </select>
+                </div>
+
                 <button type="submit" class="login-btn" id="loginBtn">
                     <span class="spinner"></span>
                     <span class="btn-text">Login</span>
@@ -342,7 +352,21 @@
     </div>
 </div>
 
+<script>
+    const togglePassword = document.querySelector('#togglePassword');
+    const password = document.querySelector('#id_password');
+    const eyeIcon = document.querySelector('#eyeIcon');
 
+    togglePassword.addEventListener('click', function (e) {
+        // toggle the type attribute
+        const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+        password.setAttribute('type', type);
+        
+        // toggle the eye icon
+        eyeIcon.classList.toggle('bi-eye');
+        eyeIcon.classList.toggle('bi-eye-slash');
+    });
+</script>
 
 </body>
 </html>
