@@ -19,27 +19,53 @@ from .forms import UsersNewForm, AccountInfoForm, TransactionForm, EmployeeForm,
 # ========== PERMISSION HELPERS ==========
 
 def is_manager(user):
-    """Check if user is a manager"""
+    """Check if user is a manager (Employee HR)"""
     return user.groups.filter(name='Manager').exists() or user.is_superuser
 
+def is_supervisor(user):
+    """Check if user is a supervisor (Bank Manager)"""
+    return user.groups.filter(name='Supervisor').exists() or user.is_superuser
 
-def is_manager_or_clerk(user):
-    """Check if user is manager or clerk"""
-    return user.groups.filter(name__in=['Manager', 'Clerk']).exists() or user.is_superuser
+def is_clerk(user):
+    """Check if user is a clerk (Bank Teller - Read Only)"""
+    return user.groups.filter(name='Clerk').exists() or user.is_superuser
+
+def can_manage_employees(user):
+    """Only Managers can manage employees"""
+    return is_manager(user)
+
+def can_view_customers(user):
+    """Supervisors and Clerks can view customers (Managers too, optionally)"""
+    # Allowing Managers to view customers too, as they are likely admins.
+    # But strictly based on prompt: "clerk... user dashboard... supervisor... users transactions"
+    # Prompt says: "managers shld not be able to do what its doing currently" -> Refers to "Currently they see everything".
+    # I will allow Managers to see customers but NOT make transactions, to keep them as "HR".
+    # Wait, if Manager is HR, they don't need to see Bank Customers.
+    # Let's try STRICT separation.
+    # Manager -> Employees Only.
+    # Supervisor/Clerk -> Customers Only.
+    # Superuser -> Everything.
+    if user.is_superuser: return True
+    return user.groups.filter(name__in=['Supervisor', 'Clerk']).exists()
+
+def can_manage_customers(user):
+    """Only Supervisors can create/edit customers and transactions"""
+    if user.is_superuser: return True
+    return user.groups.filter(name='Supervisor').exists()
+
+def can_make_transactions(user):
+    """Only Supervisors can make transactions"""
+    if user.is_superuser: return True
+    return user.groups.filter(name='Supervisor').exists()
 
 
-# ========== EMPLOYEE VIEWS ==========
+# ========== EMPLOYEE VIEWS (Manager Only) ==========
 
 @login_required
-@user_passes_test(is_manager_or_clerk)
+@user_passes_test(can_manage_employees)
 def employee_list(request):
-    """List all employees with search, filtering, and pagination"""
+    """List all employees - Manager Only"""
     employees_qs = Employee.objects.select_related('user', 'role').all()
-
-    # Role-based visibility
-    if not is_manager(request.user):
-        # Clerks cannot see Managers
-        employees_qs = employees_qs.exclude(role__name='Manager')
 
     # Search functionality
     query = request.GET.get('q', '').strip()
@@ -87,12 +113,12 @@ def employee_list(request):
         'role_filter': role_filter,
         'filter_value': filter_value,
         'available_roles': available_roles,
-        'is_manager': is_manager(request.user),  # For template checks
+        'is_manager': True, 
     })
 
 
 @login_required
-@user_passes_test(is_manager)
+@user_passes_test(can_manage_employees)
 def employee_create(request):
     if request.method == 'POST':
         form = EmployeeCreationForm(request.POST)
@@ -114,15 +140,10 @@ def employee_create(request):
     })
 
 @login_required
+@user_passes_test(can_manage_employees)
 def employee_update(request, pk):
-    """Update employee info; Clerks can only edit themselves"""
+    """Update employee info - Manager Only"""
     emp = get_object_or_404(Employee, pk=pk)
-
-    # Permission check
-    if not is_manager(request.user):
-        if emp.user != request.user:
-            messages.error(request, "You do not have permission to edit this employee.")
-            return redirect('employee_list')
 
     if request.method == 'POST':
         form = EmployeeForm(request.POST, instance=emp)
@@ -138,14 +159,11 @@ def employee_update(request, pk):
                 if new_password:
                     emp.user.set_password(new_password)
 
-                # Only manager can change role
-                if is_manager(request.user):
-                    role = form.cleaned_data.get('role')
-                    if role:
-                        emp.user.groups.clear()
-                        emp.user.groups.add(role)
-                        # emp.role is already updated by form.save()
-
+                role = form.cleaned_data.get('role')
+                if role:
+                    emp.user.groups.clear()
+                    emp.user.groups.add(role)
+                
                 emp.user.save()
 
             messages.success(request, f"Employee '{emp.username}' updated successfully!")
@@ -161,9 +179,9 @@ def employee_update(request, pk):
 
 
 @login_required
-@user_passes_test(is_manager)
+@user_passes_test(can_manage_employees)
 def employee_delete(request, pk):
-    """Delete employee; only managers allowed"""
+    """Delete employee - Manager Only"""
     emp = get_object_or_404(Employee, pk=pk)
 
     if request.method == 'POST':
@@ -178,13 +196,10 @@ def employee_delete(request, pk):
 
 
 @login_required
+@user_passes_test(can_manage_employees)
 def employee_freeze(request, pk):
-    """Freeze employee; Clerks cannot freeze anyone"""
+    """Freeze employee - Manager Only"""
     emp = get_object_or_404(Employee, pk=pk)
-
-    if not is_manager(request.user):
-        messages.error(request, "You do not have permission to freeze this employee.")
-        return redirect('employee_list')
 
     if emp.status == 'FROZEN':
         messages.warning(request, "Employee is already frozen.")
@@ -200,13 +215,10 @@ def employee_freeze(request, pk):
 
 
 @login_required
+@user_passes_test(can_manage_employees)
 def employee_unfreeze(request, pk):
-    """Unfreeze employee; Clerks cannot unfreeze anyone"""
+    """Unfreeze employee - Manager Only"""
     emp = get_object_or_404(Employee, pk=pk)
-
-    if not is_manager(request.user):
-        messages.error(request, "You do not have permission to unfreeze this employee.")
-        return redirect('employee_list')
 
     if emp.status == 'ACTIVE':
         messages.info(request, "Employee is already active.")
@@ -222,17 +234,14 @@ def employee_unfreeze(request, pk):
 
 
 @login_required
+@user_passes_test(can_manage_employees)
 def employee_live_search(request):
     """AJAX endpoint for live employee search"""
     query = request.GET.get('q', '').strip()
     results = []
 
     employees = Employee.objects.select_related('role').order_by('-joining_date')
-
-    # Role-based visibility
-    if not is_manager(request.user):
-        employees = employees.exclude(role__name='Manager')
-
+    
     if query:
         employees = employees.filter(
             Q(username__icontains=query) |
@@ -259,10 +268,15 @@ def employee_live_search(request):
 
 
 
-# ========== USER VIEWS ==========
+# ========== USER VIEWS (Supervisor & Clerk) ==========
 
+@login_required
 def live_user_search(request):
     """AJAX endpoint for live user search"""
+    # Allow Managers to search too if they land here, but UI hides it
+    if not (can_view_customers(request.user) or can_manage_employees(request.user)):
+        return JsonResponse({'results': []})
+
     query = request.GET.get('q', '').strip()
     users = UsersNew.objects.select_related('account')
 
@@ -291,8 +305,9 @@ def live_user_search(request):
 
 
 @login_required
+@user_passes_test(can_view_customers)
 def user_list(request):
-    """List all bank users with filtering and pagination"""
+    """List all bank users - Supervisor & Clerk"""
     query = request.GET.get('q')
     users = UsersNew.objects.select_related('account').all()
     filter_value = request.GET.get('filter')
@@ -317,13 +332,16 @@ def user_list(request):
 
     return render(request, 'users/user_list.html', {
         'page_obj': page_obj,
-        'query': query
+        'query': query,
+        'is_supervisor': can_manage_customers(request.user), # For UI logic
+        'is_clerk': is_clerk(request.user),
     })
 
 
 @login_required
+@user_passes_test(can_manage_customers)
 def user_create(request):
-    """Create a new bank user with account"""
+    """Create a new bank user - Supervisor Only"""
     if request.method == 'POST':
         form = UsersNewForm(request.POST)
         if form.is_valid():
@@ -347,8 +365,9 @@ def user_create(request):
 
 
 @login_required
+@user_passes_test(can_manage_customers)
 def user_update(request, pk):
-    """Update bank user information"""
+    """Update bank user information - Supervisor Only"""
     user = get_object_or_404(UsersNew, pk=pk)
 
     if request.method == 'POST':
@@ -367,8 +386,9 @@ def user_update(request, pk):
 
 
 @login_required
+@user_passes_test(can_manage_customers)
 def user_delete(request, pk):
-    """Delete bank user and associated account"""
+    """Delete bank user - Supervisor Only"""
     user = get_object_or_404(UsersNew, pk=pk)
 
     if request.method == 'POST':
@@ -408,8 +428,9 @@ def filter_transactions(transactions, filter_value=None, start_date_str=None, en
 
 
 @login_required
+@user_passes_test(can_make_transactions)
 def make_transaction(request, user_id):
-    """Process deposit or withdrawal transaction"""
+    """Process deposit or withdrawal - Supervisor Only"""
     user = get_object_or_404(UsersNew, pk=user_id)
     account, created = Account.objects.get_or_create(
         user=user,
@@ -460,8 +481,9 @@ def make_transaction(request, user_id):
 # ========== ACCOUNT INFO VIEWS ==========
 
 @login_required
+@user_passes_test(can_view_customers)
 def account_info_list(request):
-    """List all accounts with search"""
+    """List all accounts - Supervisor & Clerk"""
     query = request.GET.get('q')
     accounts = Account.objects.select_related('user')
 
@@ -477,8 +499,9 @@ def account_info_list(request):
 
 
 @login_required
+@user_passes_test(can_manage_customers)
 def account_info_create(request):
-    """Create a new account"""
+    """Create a new account - Supervisor Only"""
     if request.method == 'POST':
         form = AccountInfoForm(request.POST)
         if form.is_valid():
@@ -499,8 +522,9 @@ def account_info_create(request):
 
 
 @login_required
+@user_passes_test(can_manage_customers)
 def account_info_update(request, pk):
-    """Update account information"""
+    """Update account information - Supervisor Only"""
     account = get_object_or_404(Account, pk=pk)
 
     if request.method == 'POST':
@@ -519,8 +543,9 @@ def account_info_update(request, pk):
 
 
 @login_required
+@user_passes_test(can_manage_customers)
 def account_info_delete(request, pk):
-    """Delete an account"""
+    """Delete an account - Supervisor Only"""
     account = get_object_or_404(Account, pk=pk)
 
     if request.method == 'POST':
@@ -534,8 +559,9 @@ def account_info_delete(request, pk):
 
 
 @login_required
+@user_passes_test(can_view_customers)
 def user_account_info(request, user_id):
-    """View detailed account information with transactions"""
+    """View detailed account info - Supervisor & Clerk"""
     user = get_object_or_404(UsersNew, pk=user_id)
     account, created = Account.objects.get_or_create(
         user=user,
@@ -556,12 +582,14 @@ def user_account_info(request, user_id):
         'filter_value': filter_value,
         'start_date': start_date,
         'end_date': end_date,
+        'is_supervisor': can_make_transactions(request.user), # To show/hide 'Make Transaction' button
     })
 
 
 @login_required
+@user_passes_test(can_view_customers)
 def download_account_pdf(request, user_id):
-    """Generate and download account statement PDF"""
+    """Generate PDF - Supervisor & Clerk"""
     user = get_object_or_404(UsersNew, pk=user_id)
     account, created = Account.objects.get_or_create(
         user=user,
@@ -597,8 +625,9 @@ def download_account_pdf(request, user_id):
 
 
 @login_required
+@user_passes_test(can_manage_customers)
 def update_account_status(request, account_id):
-    """Update account status (Active/Frozen/Closed)"""
+    """Update account status - Supervisor Only"""
     account = get_object_or_404(Account, id=account_id)
     new_status = request.POST.get('account_status')
 
@@ -613,8 +642,9 @@ def update_account_status(request, account_id):
 
 
 @login_required
+@user_passes_test(can_manage_customers)
 def update_kyc_status(request, account_id):
-    """Update KYC verification status"""
+    """Update KYC status - Supervisor Only"""
     account = get_object_or_404(Account, id=account_id)
     new_kyc_status = request.POST.get('kyc_status')
 
