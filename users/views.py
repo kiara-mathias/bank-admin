@@ -62,12 +62,15 @@ def custom_login(request):
         user = authenticate(request, username=username, password=password)
         
         if user is not None:
+            # Fetch all user groups in ONE query (optimization: avoids multiple DB hits)
+            user_groups = set(user.groups.values_list('name', flat=True))
+            
             # Check if user has the selected role
             if role:
                 # If user is SUPERUSER, they can log in as ANY role (Admin/Manager/Supervisor/Clerk)
                 # If user is NORMAL, they must have the specific group assigned
                 if not user.is_superuser:
-                    if not user.groups.filter(name=role).exists():
+                    if role not in user_groups:
                         messages.error(request, "Invalid details. You are not assigned this role.")
                         return render(request, 'users/login.html')
             
@@ -81,9 +84,10 @@ def custom_login(request):
                         return redirect('user_list')
                     return redirect('employee_list') # Default for Admin/Manager selection
 
-                if is_manager(user):
+                # Use cached groups instead of multiple DB queries
+                if 'Manager' in user_groups:
                     return redirect('employee_list')
-                elif is_supervisor(user) or is_clerk(user):
+                elif 'Supervisor' in user_groups or 'Clerk' in user_groups:
                     return redirect('user_list')
                 else:
                     return redirect('user_list')

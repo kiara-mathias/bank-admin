@@ -115,6 +115,29 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Password Hashers
+# In DEBUG mode, use faster (but less secure) password hashing for development.
+# This speeds up login and user registration from ~5 seconds to <1 second.
+# WARNING: Do NOT use this in production - the default PBKDF2 with high iterations is secure.
+if DEBUG:
+    PASSWORD_HASHERS = [
+        # Fast hasher for new passwords in development
+        'django.contrib.auth.hashers.MD5PasswordHasher',
+        # Keep PBKDF2 as fallback so existing users can still login
+        # (their passwords were hashed with PBKDF2)
+        'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+        'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    ]
+else:
+    # Production: use secure hashers (Django default)
+    PASSWORD_HASHERS = [
+        'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+        'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+        'django.contrib.auth.hashers.Argon2PasswordHasher',
+        'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+        'django.contrib.auth.hashers.ScryptPasswordHasher',
+    ]
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
