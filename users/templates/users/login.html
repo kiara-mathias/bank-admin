@@ -286,11 +286,13 @@
         </div>
         
         <div class="card-body-custom">
-            {% if form.errors %}
+            {% if messages %}
+                {% for message in messages %}
                 <div class="alert alert-danger">
                     <i class="bi bi-exclamation-circle-fill"></i>
-                    <span>{{ form.non_field_errors.0|default:"Invalid credentials" }}</span>
+                    <span>{{ message }}</span>
                 </div>
+                {% endfor %}
             {% endif %}
 
             <form method="post" id="loginForm">
