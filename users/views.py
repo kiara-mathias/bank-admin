@@ -326,30 +326,12 @@ def live_user_search(request):
         
         users = users.filter(q_objects).distinct()
 
-    results = []
-    for user in users:
-        # Get status safely
-        account_status = 'N/A'
-        kyc_status = 'N/A'
-        account_no = 'N/A'
-        
-        if hasattr(user, 'account'):
-            account_status = user.account.get_account_status_display()
-            kyc_status = user.account.get_kyc_status_display()
-            account_no = user.account.account_no
-
-        results.append({
-            'id': user.pk,
-            'username': user.username,
-            'email': user.email,
-            'contact': user.contact,
-            'joining_date': user.joining_date.strftime('%Y-%m-%d'),
-            'account_no': account_no,
-            'account_status': account_status,
-            'kyc_status': kyc_status,
-        })
-
-    return JsonResponse({'results': results})
+    # Pass the users to the template for server-side rendering
+    return render(request, 'users/partials/user_table_rows.html', {
+        'page_obj': users,
+        'is_supervisor': can_manage_customers(request.user),
+        'is_clerk': is_clerk(request.user),
+    })
 
 
 @login_required
