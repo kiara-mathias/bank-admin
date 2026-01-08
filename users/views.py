@@ -328,13 +328,25 @@ def live_user_search(request):
 
     results = []
     for user in users:
+        # Get status safely
+        account_status = 'N/A'
+        kyc_status = 'N/A'
+        account_no = 'N/A'
+        
+        if hasattr(user, 'account'):
+            account_status = user.account.get_account_status_display()
+            kyc_status = user.account.get_kyc_status_display()
+            account_no = user.account.account_no
+
         results.append({
             'id': user.pk,
             'username': user.username,
             'email': user.email,
             'contact': user.contact,
             'joining_date': user.joining_date.strftime('%Y-%m-%d'),
-            'account_no': user.account.account_no if hasattr(user, 'account') else 'N/A'
+            'account_no': account_no,
+            'account_status': account_status,
+            'kyc_status': kyc_status,
         })
 
     return JsonResponse({'results': results})

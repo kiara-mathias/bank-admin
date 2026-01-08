@@ -15,29 +15,30 @@
             
             <div class="form-fields">
                 {% for field in form %}
-                    {% if field.name != 'role' or request.user.role == 'Manager' %}
-                        <p>
-                            {{ field.label_tag }}
-                            {{ field }}
-                            {% if field.help_text %}
-                                <span class="helptext">{{ field.help_text }}</span>
-                            {% endif %}
-                            {% for error in field.errors %}
-                                <div class="errorlist">{{ error }}</div>
-                            {% endfor %}
-                        </p>
-                    {% endif %}
+                    {# Only hide the 'role' field if it is NOT Employee Creation (i.e. User Creation) #}
+                    {# Or if user is not manager. But this form is used for UsersNew which has no role field in form usually #}
+                    
+                    <p>
+                        {{ field.label_tag }}
+                        {{ field }}
+                        {% if field.help_text %}
+                            <span class="helptext">{{ field.help_text }}</span>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <div class="errorlist">{{ error }}</div>
+                        {% endfor %}
+                    </p>
                 {% endfor %}
             </div>
 
             <!-- Action Buttons -->
             <div class="form-actions">
-                {% if request.user.role == 'Manager' %}
+                {# Allow submit for everyone who can access this page (permission checked in view) #}
                 <button type="submit" class="btn btn-save">
                     <i class="bi bi-check-circle"></i> Save
                 </button>
-                {% endif %}
-                <a href="{% url 'employee_list' %}" class="btn btn-cancel">
+                
+                <a href="{% url 'user_list' %}" class="btn btn-cancel">
                     Cancel
                 </a>
             </div>
@@ -48,6 +49,74 @@
 
 <style>
 /* Keep your existing styles here */
+.form-container {
+    max-width: 600px;
+    margin: 2rem auto;
+}
+.form-header {
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+.form-title {
+    font-weight: 700;
+    color: #2c3e50;
+}
+.form-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.form-fields p {
+    margin-bottom: 1.25rem;
+}
+.form-control {
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+}
+.form-actions {
+    margin-top: 2rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+.btn-save {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 0.6rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+}
+.btn-save:hover {
+    color: white;
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+.btn-cancel {
+    background: #f1f3f5;
+    color: #495057;
+    padding: 0.6rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+.btn-cancel:hover {
+    background: #e9ecef;
+    color: #212529;
+}
+.errorlist {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+.helptext {
+    display: block;
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+}
 </style>
 
 {% endblock %}
