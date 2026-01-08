@@ -68,7 +68,21 @@ def custom_login(request):
         start_time = time.time()
         user = authenticate(request, username=username, password=password)
         auth_time = time.time() - start_time
-        print(f"[TIMING] authenticate() took {auth_time:.2f}s for user '{username}'")
+        
+        # Debug: Show which hasher was used
+        if user:
+            current_hasher = user.password.split('$')[0] if '$' in user.password else 'unknown'
+            print(f"[TIMING] authenticate() took {auth_time:.2f}s for user '{username}' (hasher: {current_hasher})")
+            
+            # Force password upgrade to MD5 if still using slow hasher
+            if current_hasher.startswith('pbkdf2') and auth_time > 1.0:
+                print(f"[TIMING] Upgrading password from {current_hasher} to MD5...")
+                user.set_password(password)
+                user.save(update_fields=['password'])
+                new_hasher = user.password.split('$')[0]
+                print(f"[TIMING] Password upgraded to {new_hasher}")
+        else:
+            print(f"[TIMING] authenticate() took {auth_time:.2f}s for user '{username}' (FAILED)")
         
         if user is not None:
             # Fetch all user groups in ONE query (optimization: avoids multiple DB hits)
