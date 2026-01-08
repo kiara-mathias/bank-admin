@@ -15,25 +15,23 @@
             
             <div class="form-fields">
                 {% for field in form %}
-                    {# Only hide the 'role' field if it is NOT Employee Creation (i.e. User Creation) #}
-                    {# Or if user is not manager. But this form is used for UsersNew which has no role field in form usually #}
-                    
-                    <p>
-                        {{ field.label_tag }}
-                        {{ field }}
-                        {% if field.help_text %}
-                            <span class="helptext">{{ field.help_text }}</span>
-                        {% endif %}
-                        {% for error in field.errors %}
-                            <div class="errorlist">{{ error }}</div>
-                        {% endfor %}
-                    </p>
+                    {% if field.name != 'role' or request.user.role == 'Manager' %}
+                        <p>
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% if field.help_text %}
+                                <span class="helptext">{{ field.help_text }}</span>
+                            {% endif %}
+                            {% for error in field.errors %}
+                                <div class="errorlist">{{ error }}</div>
+                            {% endfor %}
+                        </p>
+                    {% endif %}
                 {% endfor %}
             </div>
 
             <!-- Action Buttons -->
             <div class="form-actions">
-                {# Allow submit for everyone who can access this page (permission checked in view) #}
                 <button type="submit" class="btn btn-save">
                     <i class="bi bi-check-circle"></i> Save
                 </button>
