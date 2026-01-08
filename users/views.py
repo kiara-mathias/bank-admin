@@ -1,3 +1,5 @@
+import time
+import logging
 from datetime import datetime, timedelta
 from django.db import IntegrityError, transaction
 from django.core.paginator import Paginator
@@ -12,6 +14,9 @@ from django.template.loader import get_template
 from django.utils import timezone
 from decimal import Decimal
 from xhtml2pdf import pisa
+from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 from .models import UsersNew, Account, Transaction, Employee
 from .forms import UsersNewForm, AccountInfoForm, TransactionForm, EmployeeForm, EmployeeCreationForm
@@ -59,7 +64,11 @@ def custom_login(request):
         password = request.POST.get('password')
         role = request.POST.get('role')
 
+        # TIMING: Track authentication performance
+        start_time = time.time()
         user = authenticate(request, username=username, password=password)
+        auth_time = time.time() - start_time
+        print(f"[TIMING] authenticate() took {auth_time:.2f}s for user '{username}'")
         
         if user is not None:
             # Fetch all user groups in ONE query (optimization: avoids multiple DB hits)
@@ -75,7 +84,10 @@ def custom_login(request):
                         return render(request, 'users/login.html')
             
             if user.is_active:
+                login_start = time.time()
                 login(request, user)
+                login_time = time.time() - login_start
+                print(f"[TIMING] login() took {login_time:.2f}s")
                 
                 # Redirect based on role
                 # Superuser -> Employee List by default (Manager View) or User List if they chose Supervisor/Clerk
@@ -164,7 +176,11 @@ def employee_create(request):
         form = EmployeeCreationForm(request.POST)
         if form.is_valid():
             try:
+                # TIMING: Track employee creation performance
+                start_time = time.time()
                 employee = form.save()
+                save_time = time.time() - start_time
+                print(f"[TIMING] Employee creation (form.save()) took {save_time:.2f}s")
                 messages.success(request, f"Employee '{employee.username}' created successfully.")
                 return redirect('employee_list')
             except IntegrityError:
