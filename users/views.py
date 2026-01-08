@@ -68,7 +68,7 @@ def custom_login(request):
                 # If user is NORMAL, they must have the specific group assigned
                 if not user.is_superuser:
                     if not user.groups.filter(name=role).exists():
-                        messages.error(request, f"Access Denied: You are not assigned the role '{role}'.")
+                        messages.error(request, "Invalid details. You are not assigned this role.")
                         return render(request, 'users/login.html')
             
             if user.is_active:
