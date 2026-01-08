@@ -41,14 +41,14 @@ def can_view_customers(user):
     return user.groups.filter(name__in=['Supervisor', 'Clerk']).exists()
 
 def can_manage_customers(user):
-    """Only Supervisors can create/edit customers and transactions"""
+    """Only Supervisors can create/edit customers"""
     if user.is_superuser: return True
     return user.groups.filter(name='Supervisor').exists()
 
 def can_make_transactions(user):
-    """Only Supervisors can make transactions"""
+    """Supervisors AND Clerks can make transactions"""
     if user.is_superuser: return True
-    return user.groups.filter(name='Supervisor').exists()
+    return user.groups.filter(name__in=['Supervisor', 'Clerk']).exists()
 
 
 # ========== AUTHENTICATION VIEWS ==========
@@ -467,7 +467,7 @@ def filter_transactions(transactions, filter_value=None, start_date_str=None, en
 @login_required
 @user_passes_test(can_make_transactions)
 def make_transaction(request, user_id):
-    """Process deposit or withdrawal - Supervisor Only"""
+    """Process deposit or withdrawal - Supervisor & Clerk"""
     user = get_object_or_404(UsersNew, pk=user_id)
     account, created = Account.objects.get_or_create(
         user=user,
@@ -619,7 +619,7 @@ def user_account_info(request, user_id):
         'filter_value': filter_value,
         'start_date': start_date,
         'end_date': end_date,
-        'is_supervisor': can_make_transactions(request.user), # To show/hide 'Make Transaction' button
+        'is_supervisor': can_make_transactions(request.user), # To show/hide 'Make Transaction' button (Supervisor & Clerk)
     })
 
 
