@@ -1,0 +1,96 @@
+{% for user in page_obj %}
+<tr class="user-row">
+    <td>
+        <a href="{% url 'user_account_info' user.pk %}" class="user-link">
+            {{ user.username }}
+        </a>
+    </td>
+    <td>
+        <span class="account-number">
+            {{ user.account.account_no|default:"N/A" }}
+        </span>
+    </td>
+    <td>
+        {% if user.account %}
+            {% if is_supervisor %}
+            <form method="post" action="{% url 'update_account_status' user.account.id %}" class="inline-form">
+                {% csrf_token %}
+                <select name="account_status" onchange="this.form.submit()" class="status-select status-{{ user.account.account_status }}">
+                    {% for key, label in user.account.STATUS_CHOICES %}
+                        <option value="{{ key }}" {% if user.account.account_status == key %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+            {% else %}
+                <span class="status-select status-{{ user.account.account_status }}" style="cursor: default;">
+                    {{ user.account.get_account_status_display }}
+                </span>
+            {% endif %}
+        {% else %}
+            <span class="text-muted">N/A</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if user.account %}
+            {% if is_supervisor %}
+            <form method="post" action="{% url 'update_kyc_status' user.account.id %}" class="inline-form">
+                {% csrf_token %}
+                <select name="kyc_status" onchange="this.form.submit()" class="kyc-select kyc-{{ user.account.kyc_status }}">
+                    {% for key, label in user.account.KYC_CHOICES %}
+                        <option value="{{ key }}" {% if user.account.kyc_status == key %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+            {% else %}
+                <span class="kyc-select kyc-{{ user.account.kyc_status }}" style="cursor: default;">
+                    {{ user.account.get_kyc_status_display }}
+                </span>
+            {% endif %}
+        {% else %}
+            <span class="text-muted">N/A</span>
+        {% endif %}
+    </td>
+    <td>
+        <span class="date-text">
+            {{ user.joining_date }}
+        </span>
+    </td>
+    
+    <td>
+        <div class="action-buttons">
+            {% if is_supervisor %}
+            <a href="{% url 'user_update' user.pk %}" 
+               class="action-btn edit-btn"
+               title="Edit User">
+                <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'user_delete' user.pk %}" 
+               class="action-btn delete-btn"
+               title="Delete User">
+                <i class="bi bi-trash"></i>
+            </a>
+            {% else %}
+            <span class="text-muted" style="font-size: 0.8rem;">Read-only</span>
+            {% endif %}
+        </div>
+    </td>
+</tr>
+{% empty %}
+<tr>
+    <td colspan="6" class="empty-state">
+        <div class="empty-content">
+            <i class="bi bi-inbox"></i>
+            <p>No users found</p>
+            {% if is_supervisor %}
+            <a href="{% url 'user_create' %}" class="btn-primary-custom">
+                <i class="bi bi-plus-circle"></i> Create First User
+            </a>
+            {% endif %}
+        </div>
+    </td>
+</tr>
+{% endfor %}

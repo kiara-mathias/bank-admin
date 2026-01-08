@@ -79,102 +79,7 @@
                 </thead>
 
                 <tbody id="users-table-body">
-                    {% for user in page_obj %}
-                    <tr class="user-row">
-                        <td>
-                            <a href="{% url 'user_account_info' user.pk %}" class="user-link">
-                                {{ user.username }}
-                            </a>
-                        </td>
-                        <td>
-                            <span class="account-number">
-                                {{ user.account.account_no|default:"N/A" }}
-                            </span>
-                        </td>
-                        <td>
-                            {% if user.account %}
-                                {% if is_supervisor %}
-                                <form method="post" action="{% url 'update_account_status' user.account.id %}" class="inline-form">
-                                    {% csrf_token %}
-                                    <select name="account_status" onchange="this.form.submit()" class="status-select status-{{ user.account.account_status }}">
-                                        {% for key, label in user.account.STATUS_CHOICES %}
-                                            <option value="{{ key }}" {% if user.account.account_status == key %}selected{% endif %}>
-                                                {{ label }}
-                                            </option>
-                                        {% endfor %}
-                                    </select>
-                                </form>
-                                {% else %}
-                                    <span class="status-select status-{{ user.account.account_status }}" style="cursor: default;">
-                                        {{ user.account.get_account_status_display }}
-                                    </span>
-                                {% endif %}
-                            {% else %}
-                                <span class="text-muted">N/A</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if user.account %}
-                                {% if is_supervisor %}
-                                <form method="post" action="{% url 'update_kyc_status' user.account.id %}" class="inline-form">
-                                    {% csrf_token %}
-                                    <select name="kyc_status" onchange="this.form.submit()" class="kyc-select kyc-{{ user.account.kyc_status }}">
-                                        {% for key, label in user.account.KYC_CHOICES %}
-                                            <option value="{{ key }}" {% if user.account.kyc_status == key %}selected{% endif %}>
-                                                {{ label }}
-                                            </option>
-                                        {% endfor %}
-                                    </select>
-                                </form>
-                                {% else %}
-                                    <span class="kyc-select kyc-{{ user.account.kyc_status }}" style="cursor: default;">
-                                        {{ user.account.get_kyc_status_display }}
-                                    </span>
-                                {% endif %}
-                            {% else %}
-                                <span class="text-muted">N/A</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span class="date-text">
-                                {{ user.joining_date }}
-                            </span>
-                        </td>
-                        
-                        <td>
-                            <div class="action-buttons">
-                                {% if is_supervisor %}
-                                <a href="{% url 'user_update' user.pk %}" 
-                                   class="action-btn edit-btn"
-                                   title="Edit User">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-                                <a href="{% url 'user_delete' user.pk %}" 
-                                   class="action-btn delete-btn"
-                                   title="Delete User">
-                                    <i class="bi bi-trash"></i>
-                                </a>
-                                {% else %}
-                                <span class="text-muted" style="font-size: 0.8rem;">Read-only</span>
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="empty-state">
-                            <div class="empty-content">
-                                <i class="bi bi-inbox"></i>
-                                <p>No users found</p>
-                                {% if is_supervisor %}
-                                <a href="{% url 'user_create' %}" class="btn-primary-custom">
-                                    <i class="bi bi-plus-circle"></i> Create First User
-                                </a>
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
+                    {% include 'users/partials/user_table_rows.html' %}
                 </tbody>
             </table>
         </div>
@@ -223,28 +128,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const searchInput = document.getElementById('live-search');
-    const dateFilter = document.getElementById('date-filter');
     const tableBody = document.getElementById('users-table-body');
-    const isSupervisor = {{ is_supervisor|yesno:"true,false" }};
-
-    // Handle date filter change
-    if (dateFilter) {
-        dateFilter.addEventListener('change', function() {
-            const filterValue = this.value;
-            const currentUrl = new URL(window.location.href);
-            
-            if (filterValue === 'all') {
-                currentUrl.searchParams.delete('filter');
-            } else {
-                currentUrl.searchParams.set('filter', filterValue);
-            }
-            
-            // Reset to page 1 when filtering
-            currentUrl.searchParams.delete('page');
-            
-            window.location.href = currentUrl.toString();
-        });
-    }
 
     // Live search functionality
     if (searchInput && tableBody) {
@@ -252,74 +136,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const query = this.value.trim();
 
             fetch(`/users/live-search/?q=${query}`)
-                .then(response => response.json())
-                .then(data => {
-                    tableBody.innerHTML = '';
-
-                    if (data.results.length === 0) {
-                        tableBody.innerHTML = `
-                            <tr>
-                                <td colspan="6" class="empty-state">
-                                    <div class="empty-content">
-                                        <i class="bi bi-inbox"></i>
-                                        <p>No users match your search</p>
-                                    </div>
-                                </td>
-                            </tr>`;
-                        return;
-                    }
-
-                    data.results.forEach(user => {
-                        let actionsHtml = '<span class="text-muted" style="font-size: 0.8rem;">Read-only</span>';
-                        if (isSupervisor) {
-                            actionsHtml = `
-                                <a href="/users/update/${user.id}/" class="action-btn edit-btn" title="Edit">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-                                <a href="/users/delete/${user.id}/" class="action-btn delete-btn" title="Delete">
-                                    <i class="bi bi-trash"></i>
-                                </a>
-                            `;
-                        }
-
-                        tableBody.innerHTML += `
-                            <tr class="user-row">
-                                <td>
-                                    <a href="/users/${user.id}/accounts/" class="user-link">
-                                        ${highlight(user.username, query)}
-                                    </a>
-                                </td>
-                                <td>
-                                    <span class="account-number">
-                                        ${highlight(user.account_no, query)}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span class="status-badge">${user.account_status || 'N/A'}</span>
-                                </td>
-                                <td>
-                                    <span class="kyc-badge">${user.kyc_status || 'N/A'}</span>
-                                </td>
-                                <td>
-                                    <span class="date-text">${user.joining_date}</span>
-                                </td>
-                                <td>
-                                    <div class="action-buttons">
-                                        ${actionsHtml}
-                                    </div>
-                                </td>
-                            </tr>`;
-                    });
+                .then(response => response.text())
+                .then(html => {
+                    tableBody.innerHTML = html;
                 })
                 .catch(err => console.error("Search error:", err));
         });
-    }
-
-    function highlight(text, query) {
-        if (!query) return text;
-        text = String(text);
-        const regex = new RegExp(`(${query})`, 'gi');
-        return text.replace(regex, `<mark>$1</mark>`);
     }
 });
 </script>
