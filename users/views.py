@@ -893,6 +893,7 @@ def user_account_info(request, user_id):
         'start_date': start_date,
         'end_date': end_date,
         'is_supervisor': can_make_transactions(request.user), # To show/hide 'Make Transaction' button (Supervisor & Clerk)
+        'is_customer': False,  # Staff view, not customer
     })
 
 
