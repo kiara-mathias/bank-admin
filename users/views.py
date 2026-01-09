@@ -1041,7 +1041,11 @@ def customer_dashboard(request):
 
 @customer_login_required
 def customer_request_transaction(request):
-    """Customer submits a transaction request (always requires approval)"""
+    """
+    Customer transaction - same control flow as staff:
+    - Within limits (₹10,000/txn, ₹50,000/day): Auto-approved
+    - Exceeds limits: Requires staff approval
+    """
     customer_id = request.session.get('customer_id')
     
     if not customer_id:
@@ -1078,38 +1082,76 @@ def customer_request_transaction(request):
             amount = form.cleaned_data['amount']
             description = form.cleaned_data.get('description', '')
             
-            # For withdrawals, check sufficient balance
+            # 3. For withdrawals, check sufficient balance
             if txn_type == 'withdraw':
                 if amount > account.current_balance:
-                    messages.error(request, 'Insufficient balance for this withdrawal request.')
+                    messages.error(request, 'Insufficient balance for this withdrawal.')
                     return redirect('customer_request_transaction')
             
-            # All customer requests require approval (security measure)
-            TransactionRequest.objects.create(
-                account=account,
-                txn_type=txn_type,
-                amount=amount,
-                description=description,
-                status='PENDING'
-            )
+            # 4. Check transaction limits
+            daily_total = TransactionRequest.get_daily_total(account)
+            exceeds_per_txn = amount > TRANSACTION_LIMIT_PER_TXN
+            exceeds_daily = (daily_total + amount) > TRANSACTION_LIMIT_PER_DAY
             
-            messages.success(
-                request, 
-                f'Your {txn_type} request of ₹{amount:,.2f} has been submitted for review. '
-                f'You will see it in your transaction history once approved.'
-            )
-            return redirect('customer_dashboard')
+            # 5. Decide: Auto-approve or Pending
+            if exceeds_per_txn or exceeds_daily:
+                # ========== PENDING REQUEST (needs approval) ==========
+                reason = []
+                if exceeds_per_txn:
+                    reason.append(f'exceeds ₹{TRANSACTION_LIMIT_PER_TXN:,.0f} per transaction limit')
+                if exceeds_daily:
+                    reason.append(f'exceeds ₹{TRANSACTION_LIMIT_PER_DAY:,.0f} daily limit')
+                
+                TransactionRequest.objects.create(
+                    account=account,
+                    txn_type=txn_type,
+                    amount=amount,
+                    description=description,
+                    status='PENDING'
+                )
+                
+                messages.warning(
+                    request, 
+                    f'Your {txn_type} of ₹{amount:,.2f} requires approval ({", ".join(reason)}). '
+                    f'You will be notified once reviewed.'
+                )
+                return redirect('customer_dashboard')
+            
+            else:
+                # ========== AUTO-APPROVED (within limits) ==========
+                if txn_type == 'withdraw':
+                    new_balance = account.current_balance - amount
+                else:  # deposit
+                    new_balance = account.current_balance + amount
+
+                account.current_balance = new_balance
+                account.save()
+                
+                txn = Transaction.objects.create(
+                    account=account,
+                    current_balance=new_balance,
+                    txn_type=txn_type,
+                    amount=amount,
+                    description=description or 'Self-service transaction'
+                )
+                
+                messages.success(request, f'Transaction successful! ₹{amount:,.2f} {txn_type} completed.')
+                return redirect('customer_dashboard')
     else:
         form = TransactionForm()
     
-    # Get pending requests count
+    # Get pending requests count and daily total
     pending_count = TransactionRequest.objects.filter(account=account, status='PENDING').count()
+    daily_total = TransactionRequest.get_daily_total(account)
     
     return render(request, 'users/customer_transaction_request.html', {
         'form': form,
         'customer': customer,
         'account': account,
         'pending_count': pending_count,
+        'daily_total': daily_total,
+        'limit_per_txn': TRANSACTION_LIMIT_PER_TXN,
+        'limit_per_day': TRANSACTION_LIMIT_PER_DAY,
     })
 
 

@@ -33,16 +33,37 @@
             </div>
             {% endif %}
 
-            <!-- Transaction Request Form -->
+            <!-- Transaction Limits Info -->
+            <div class="card mb-3 border-info">
+                <div class="card-body">
+                    <h6 class="card-title text-info"><i class="bi bi-info-circle"></i> Transaction Limits</h6>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <small class="text-muted">Per Transaction</small>
+                            <h5 class="mb-0">₹{{ limit_per_txn|floatformat:0 }}</h5>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Daily Limit</small>
+                            <h5 class="mb-0">₹{{ limit_per_day|floatformat:0 }}</h5>
+                        </div>
+                    </div>
+                    <hr class="my-2">
+                    <small class="text-muted">
+                        <i class="bi bi-graph-up"></i> Today's usage: ₹{{ daily_total|floatformat:2 }} / ₹{{ limit_per_day|floatformat:0 }}
+                    </small>
+                </div>
+            </div>
+
+            <!-- Transaction Form -->
             <div class="card">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Request Transaction</h5>
+                    <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Make Transaction</h5>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-info mb-4">
-                        <i class="bi bi-info-circle"></i>
-                        <strong>Note:</strong> All transaction requests require approval by bank staff. 
-                        Your balance will be updated once the request is approved.
+                    <div class="alert alert-success mb-4">
+                        <i class="bi bi-check-circle"></i>
+                        <strong>Instant Processing:</strong> Transactions within limits are processed immediately.
+                        <br><small class="text-muted">Transactions exceeding limits will require staff approval.</small>
                     </div>
 
                     <form method="post">
@@ -80,7 +101,7 @@
 
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="bi bi-send"></i> Submit Request
+                                <i class="bi bi-check-circle"></i> Submit Transaction
                             </button>
                             <a href="{% url 'customer_dashboard' %}" class="btn btn-outline-secondary">
                                 <i class="bi bi-arrow-left"></i> Back to Dashboard
