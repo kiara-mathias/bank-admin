@@ -337,6 +337,7 @@
                         <option value="Supervisor">Supervisor</option>
                         <option value="Clerk">Clerk</option>
                     </select>
+                    <small id="roleHint" class="text-muted" style="display: none;"></small>
                 </div>
 
                 <button type="submit" class="login-btn" id="loginBtn">
@@ -368,6 +369,54 @@
         eyeIcon.classList.toggle('bi-eye');
         eyeIcon.classList.toggle('bi-eye-slash');
     });
+
+    // Auto-fill role based on username
+    const usernameField = document.querySelector('#id_username');
+    const roleField = document.querySelector('#id_role');
+    const roleHint = document.querySelector('#roleHint');
+    let fetchTimeout = null;
+
+    usernameField.addEventListener('blur', fetchUserRole);
+    usernameField.addEventListener('input', function() {
+        // Debounce: wait 500ms after user stops typing
+        clearTimeout(fetchTimeout);
+        fetchTimeout = setTimeout(fetchUserRole, 500);
+    });
+
+    function fetchUserRole() {
+        const username = usernameField.value.trim();
+        
+        if (!username) {
+            roleField.value = '';
+            roleHint.style.display = 'none';
+            return;
+        }
+
+        fetch(`/get-user-role/?username=${encodeURIComponent(username)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.is_superuser) {
+                    // Superuser can choose any role
+                    roleHint.textContent = 'Admin user - you can select any role';
+                    roleHint.style.display = 'block';
+                    roleHint.className = 'text-info';
+                } else if (data.role) {
+                    // Auto-select the user's role
+                    roleField.value = data.role;
+                    roleHint.textContent = `Role auto-filled: ${data.role}`;
+                    roleHint.style.display = 'block';
+                    roleHint.className = 'text-success';
+                } else {
+                    // No role found or user doesn't exist
+                    roleField.value = '';
+                    roleHint.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching role:', error);
+                roleHint.style.display = 'none';
+            });
+    }
 </script>
 
 </body>

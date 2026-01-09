@@ -58,6 +58,31 @@ def can_make_transactions(user):
 
 # ========== AUTHENTICATION VIEWS ==========
 
+def get_user_role(request):
+    """AJAX endpoint to fetch user's assigned role based on username"""
+    username = request.GET.get('username', '').strip()
+    
+    if not username:
+        return JsonResponse({'role': None})
+    
+    try:
+        user = User.objects.get(username=username)
+        
+        # Superusers can choose any role, so don't auto-fill
+        if user.is_superuser:
+            return JsonResponse({'role': None, 'is_superuser': True})
+        
+        # Get the user's first assigned group (role)
+        group = user.groups.first()
+        if group:
+            return JsonResponse({'role': group.name})
+        else:
+            return JsonResponse({'role': None})
+            
+    except User.DoesNotExist:
+        return JsonResponse({'role': None})
+
+
 def custom_login(request):
     if request.method == 'POST':
         username = request.POST.get('username')

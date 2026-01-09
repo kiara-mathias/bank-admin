@@ -6,6 +6,7 @@ from . import views
 urlpatterns = [
     # Custom Login
     path('', views.custom_login, name='login'),
+    path('get-user-role/', views.get_user_role, name='get_user_role'),
     
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
 
