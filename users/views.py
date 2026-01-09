@@ -5,7 +5,8 @@ from django.db import IntegrityError, transaction
 from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.db.models import Q
+from django.db.models import Q, Sum
+from django.db import models
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -18,7 +19,10 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-from .models import UsersNew, Account, Transaction, Employee
+from .models import (
+    UsersNew, Account, Transaction, Employee, TransactionRequest,
+    TRANSACTION_LIMIT_PER_TXN, TRANSACTION_LIMIT_PER_DAY
+)
 from .forms import UsersNewForm, AccountInfoForm, TransactionForm, EmployeeForm, EmployeeCreationForm
 
 
@@ -557,7 +561,18 @@ def filter_transactions(transactions, filter_value=None, start_date_str=None, en
 @login_required
 @user_passes_test(can_make_transactions)
 def make_transaction(request, user_id):
-    """Process deposit or withdrawal - Supervisor & Clerk"""
+    """
+    Process deposit or withdrawal - Supervisor & Clerk
+    
+    Control Flow:
+    1. Check account status (must be ACTIVE)
+    2. Check KYC status (must be VERIFIED)
+    3. For withdrawals, check sufficient balance
+    4. Check transaction limits:
+       - Per transaction: ₹10,000
+       - Per day: ₹50,000
+    5. Auto-approve if within limits, else create pending request
+    """
     user = get_object_or_404(UsersNew, pk=user_id)
     account, created = Account.objects.get_or_create(
         user=user,
@@ -570,38 +585,206 @@ def make_transaction(request, user_id):
     for _ in storage:
         pass
 
+    # ========== PRE-TRANSACTION CHECKS ==========
+    # 1. Check account status
+    if account.account_status != 'ACTIVE':
+        messages.error(request, f'Transaction blocked: Account is {account.get_account_status_display()}.')
+        return redirect('user_account_info', user_id=user.pk)
+    
+    # 2. Check KYC status
+    if account.kyc_status != 'VERIFIED':
+        messages.error(request, f'Transaction blocked: KYC is {account.get_kyc_status_display()}. Please complete KYC verification first.')
+        return redirect('user_account_info', user_id=user.pk)
+
     if request.method == 'POST':
         form = TransactionForm(request.POST)
         if form.is_valid():
-            if form.cleaned_data['txn_type'] == 'withdraw':
-                if form.cleaned_data['amount'] > account.current_balance:
-                    messages.error(request, 'Insufficient balance')
+            txn_type = form.cleaned_data['txn_type']
+            amount = form.cleaned_data['amount']
+            description = form.cleaned_data.get('description', '')
+            
+            # 3. For withdrawals, check sufficient balance
+            if txn_type == 'withdraw':
+                if amount > account.current_balance:
+                    messages.error(request, 'Insufficient balance for this withdrawal.')
                     return redirect('make_transaction', user_id=user.pk)
-                new_balance = account.current_balance - form.cleaned_data['amount']
-            else:  # deposit
-                new_balance = account.current_balance + form.cleaned_data['amount']
+            
+            # 4. Check transaction limits
+            daily_total = TransactionRequest.get_daily_total(account)
+            exceeds_per_txn = amount > TRANSACTION_LIMIT_PER_TXN
+            exceeds_daily = (daily_total + amount) > TRANSACTION_LIMIT_PER_DAY
+            
+            # 5. Decide: Auto-approve or Pending
+            if exceeds_per_txn or exceeds_daily:
+                # ========== PENDING REQUEST (needs approval) ==========
+                reason = []
+                if exceeds_per_txn:
+                    reason.append(f'exceeds per-transaction limit of ₹{TRANSACTION_LIMIT_PER_TXN:,.2f}')
+                if exceeds_daily:
+                    reason.append(f'exceeds daily limit of ₹{TRANSACTION_LIMIT_PER_DAY:,.2f}')
+                
+                # Create pending request
+                TransactionRequest.objects.create(
+                    account=account,
+                    txn_type=txn_type,
+                    amount=amount,
+                    description=description,
+                    status='PENDING'
+                )
+                
+                messages.warning(
+                    request, 
+                    f'Transaction of ₹{amount:,.2f} requires approval ({", ".join(reason)}). '
+                    f'Request submitted for review.'
+                )
+                return redirect('user_account_info', user_id=user.pk)
+            
+            else:
+                # ========== AUTO-APPROVED (within limits) ==========
+                if txn_type == 'withdraw':
+                    new_balance = account.current_balance - amount
+                else:  # deposit
+                    new_balance = account.current_balance + amount
 
-            account.current_balance = new_balance
-            account.save()
-            
-            txn = Transaction(
-                account=account,
-                current_balance=new_balance,
-                txn_type=form.cleaned_data['txn_type'],
-                amount=form.cleaned_data['amount'],
-                description=form.cleaned_data.get('description', '')
-            )
-            txn.save()
-            
-            messages.success(request, 'Transaction successful!')
-            return redirect('user_account_info', user_id=user.pk)
+                account.current_balance = new_balance
+                account.save()
+                
+                txn = Transaction(
+                    account=account,
+                    current_balance=new_balance,
+                    txn_type=txn_type,
+                    amount=amount,
+                    description=description
+                )
+                txn.save()
+                
+                messages.success(request, f'Transaction of ₹{amount:,.2f} completed successfully!')
+                return redirect('user_account_info', user_id=user.pk)
     else:
         form = TransactionForm()
+
+    # Get pending requests count for this account
+    pending_requests = TransactionRequest.objects.filter(account=account, status='PENDING').count()
+    daily_total = TransactionRequest.get_daily_total(account)
 
     return render(request, 'users/transaction_form.html', {
         'form': form,
         'user': user,
-        'current_balance': current_balance
+        'account': account,
+        'current_balance': current_balance,
+        'pending_requests': pending_requests,
+        'daily_total': daily_total,
+        'limit_per_txn': TRANSACTION_LIMIT_PER_TXN,
+        'limit_per_day': TRANSACTION_LIMIT_PER_DAY,
+    })
+
+
+# ========== TRANSACTION REQUEST APPROVAL VIEWS (Staff Only) ==========
+
+@login_required
+@user_passes_test(can_make_transactions)
+def pending_transaction_list(request):
+    """List all pending transaction requests - Supervisor & Clerk can view and approve"""
+    pending_requests = TransactionRequest.objects.filter(status='PENDING').select_related('account', 'account__user').order_by('-requested_at')
+    
+    # Filter by account if specified
+    account_filter = request.GET.get('account')
+    if account_filter:
+        pending_requests = pending_requests.filter(account__account_no=account_filter)
+    
+    # Get counts for dashboard
+    total_pending = pending_requests.count()
+    total_amount_pending = pending_requests.aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
+    
+    return render(request, 'users/pending_transactions.html', {
+        'pending_requests': pending_requests,
+        'total_pending': total_pending,
+        'total_amount_pending': total_amount_pending,
+        'limit_per_txn': TRANSACTION_LIMIT_PER_TXN,
+        'limit_per_day': TRANSACTION_LIMIT_PER_DAY,
+    })
+
+
+@login_required
+@user_passes_test(can_make_transactions)
+def approve_transaction(request, request_id):
+    """Approve a pending transaction request"""
+    txn_request = get_object_or_404(TransactionRequest, pk=request_id, status='PENDING')
+    account = txn_request.account
+    
+    # Re-validate before approval
+    # 1. Check account status
+    if account.account_status != 'ACTIVE':
+        messages.error(request, f'Cannot approve: Account is {account.get_account_status_display()}.')
+        return redirect('pending_transaction_list')
+    
+    # 2. Check KYC status
+    if account.kyc_status != 'VERIFIED':
+        messages.error(request, f'Cannot approve: KYC is {account.get_kyc_status_display()}.')
+        return redirect('pending_transaction_list')
+    
+    # 3. For withdrawals, re-check balance
+    if txn_request.txn_type == 'withdraw':
+        if txn_request.amount > account.current_balance:
+            messages.error(request, f'Cannot approve: Insufficient balance. Current balance: ₹{account.current_balance:,.2f}')
+            return redirect('pending_transaction_list')
+    
+    # Process the transaction
+    if txn_request.txn_type == 'withdraw':
+        new_balance = account.current_balance - txn_request.amount
+    else:  # deposit
+        new_balance = account.current_balance + txn_request.amount
+    
+    # Update account balance
+    account.current_balance = new_balance
+    account.save()
+    
+    # Create the actual transaction
+    txn = Transaction.objects.create(
+        account=account,
+        current_balance=new_balance,
+        txn_type=txn_request.txn_type,
+        amount=txn_request.amount,
+        description=txn_request.description or f'Approved by {request.user.username}'
+    )
+    
+    # Update the request status
+    txn_request.status = 'APPROVED'
+    txn_request.reviewed_by = request.user
+    txn_request.reviewed_at = timezone.now()
+    txn_request.transaction = txn
+    txn_request.save()
+    
+    messages.success(
+        request, 
+        f'Transaction approved: {txn_request.txn_type.title()} of ₹{txn_request.amount:,.2f} for account {account.account_no}'
+    )
+    return redirect('pending_transaction_list')
+
+
+@login_required
+@user_passes_test(can_make_transactions)
+def reject_transaction(request, request_id):
+    """Reject a pending transaction request"""
+    txn_request = get_object_or_404(TransactionRequest, pk=request_id, status='PENDING')
+    
+    if request.method == 'POST':
+        rejection_reason = request.POST.get('rejection_reason', '').strip()
+        
+        txn_request.status = 'REJECTED'
+        txn_request.reviewed_by = request.user
+        txn_request.reviewed_at = timezone.now()
+        txn_request.rejection_reason = rejection_reason or 'No reason provided'
+        txn_request.save()
+        
+        messages.success(
+            request, 
+            f'Transaction rejected: {txn_request.txn_type.title()} of ₹{txn_request.amount:,.2f} for account {txn_request.account.account_no}'
+        )
+        return redirect('pending_transaction_list')
+    
+    return render(request, 'users/reject_transaction.html', {
+        'txn_request': txn_request
     })
 
 
@@ -828,6 +1011,18 @@ def customer_dashboard(request):
     transactions = Transaction.objects.filter(account=account).order_by('-txn_datetime')
     transactions = filter_transactions(transactions, filter_value, start_date, end_date)
     
+    # Get pending transaction requests for this customer
+    pending_requests = TransactionRequest.objects.filter(
+        account=account, 
+        status='PENDING'
+    ).order_by('-requested_at')
+    
+    # Get rejected requests (recent ones)
+    rejected_requests = TransactionRequest.objects.filter(
+        account=account,
+        status='REJECTED'
+    ).order_by('-reviewed_at')[:5]
+    
     # Reuse the SAME template as staff, but with customer context
     return render(request, 'users/user_account_info.html', {
         'user': customer,  # Same variable name as staff view
@@ -838,6 +1033,82 @@ def customer_dashboard(request):
         'end_date': end_date,
         'is_customer': True,  # Flag to hide staff-only features in template
         'is_supervisor': False,  # Customer can't make transactions
+        'pending_requests': pending_requests,
+        'rejected_requests': rejected_requests,
+    })
+
+
+@customer_login_required
+def customer_request_transaction(request):
+    """Customer submits a transaction request (always requires approval)"""
+    customer_id = request.session.get('customer_id')
+    
+    if not customer_id:
+        messages.error(request, "Session expired. Please login again.")
+        return redirect('login')
+    
+    try:
+        customer = UsersNew.objects.get(emp_id=customer_id)
+    except UsersNew.DoesNotExist:
+        messages.error(request, "Customer not found. Please login again.")
+        request.session.flush()
+        return redirect('login')
+    
+    account, created = Account.objects.get_or_create(
+        user=customer,
+        defaults={'current_balance': Decimal('500.00')}
+    )
+    
+    # ========== PRE-REQUEST CHECKS ==========
+    # 1. Check account status
+    if account.account_status != 'ACTIVE':
+        messages.error(request, f'Transaction blocked: Your account is {account.get_account_status_display()}.')
+        return redirect('customer_dashboard')
+    
+    # 2. Check KYC status
+    if account.kyc_status != 'VERIFIED':
+        messages.error(request, f'Transaction blocked: Your KYC is {account.get_kyc_status_display()}. Please complete KYC verification first.')
+        return redirect('customer_dashboard')
+    
+    if request.method == 'POST':
+        form = TransactionForm(request.POST)
+        if form.is_valid():
+            txn_type = form.cleaned_data['txn_type']
+            amount = form.cleaned_data['amount']
+            description = form.cleaned_data.get('description', '')
+            
+            # For withdrawals, check sufficient balance
+            if txn_type == 'withdraw':
+                if amount > account.current_balance:
+                    messages.error(request, 'Insufficient balance for this withdrawal request.')
+                    return redirect('customer_request_transaction')
+            
+            # All customer requests require approval (security measure)
+            TransactionRequest.objects.create(
+                account=account,
+                txn_type=txn_type,
+                amount=amount,
+                description=description,
+                status='PENDING'
+            )
+            
+            messages.success(
+                request, 
+                f'Your {txn_type} request of ₹{amount:,.2f} has been submitted for review. '
+                f'You will see it in your transaction history once approved.'
+            )
+            return redirect('customer_dashboard')
+    else:
+        form = TransactionForm()
+    
+    # Get pending requests count
+    pending_count = TransactionRequest.objects.filter(account=account, status='PENDING').count()
+    
+    return render(request, 'users/customer_transaction_request.html', {
+        'form': form,
+        'customer': customer,
+        'account': account,
+        'pending_count': pending_count,
     })
 
 

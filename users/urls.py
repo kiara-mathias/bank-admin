@@ -30,6 +30,11 @@ urlpatterns = [
    # user specific account info
     path('users/<int:user_id>/accounts/', login_required(views.user_account_info), name='user_account_info'),
     path('users/<int:user_id>/make_transaction/', login_required(views.make_transaction), name='make_transaction'),
+    
+    # Transaction approval (Staff)
+    path('transactions/pending/', login_required(views.pending_transaction_list), name='pending_transaction_list'),
+    path('transactions/approve/<int:request_id>/', login_required(views.approve_transaction), name='approve_transaction'),
+    path('transactions/reject/<int:request_id>/', login_required(views.reject_transaction), name='reject_transaction'),
 
     
     # employee 
@@ -49,6 +54,7 @@ urlpatterns = [
     
     # Customer views
     path('customer/dashboard/', views.customer_dashboard, name='customer_dashboard'),
+    path('customer/request-transaction/', views.customer_request_transaction, name='customer_request_transaction'),
     path('customer/download_pdf/', views.customer_download_pdf, name='customer_download_pdf'),
     path('customer/logout/', views.customer_logout, name='customer_logout'),
 ]

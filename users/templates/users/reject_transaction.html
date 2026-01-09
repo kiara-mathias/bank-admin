@@ -1,0 +1,83 @@
+{% extends 'users/base.html' %}
+
+{% block navbar_actions_left %}
+<span class="text-light">
+    <i class="bi bi-x-circle"></i> Reject Transaction Request
+</span>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="bi bi-x-circle"></i> Reject Transaction Request #{{ txn_request.id }}</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Request Details -->
+                    <div class="mb-4">
+                        <h6 class="text-muted">Request Details</h6>
+                        <table class="table table-sm">
+                            <tr>
+                                <th>Account:</th>
+                                <td>{{ txn_request.account.account_no }}</td>
+                            </tr>
+                            <tr>
+                                <th>Customer:</th>
+                                <td>{{ txn_request.account.user.username }}</td>
+                            </tr>
+                            <tr>
+                                <th>Type:</th>
+                                <td>
+                                    <span class="badge {% if txn_request.txn_type == 'deposit' %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ txn_request.txn_type|title }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Amount:</th>
+                                <td><strong>₹{{ txn_request.amount|floatformat:2 }}</strong></td>
+                            </tr>
+                            <tr>
+                                <th>Description:</th>
+                                <td>{{ txn_request.description|default:"-" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Requested:</th>
+                                <td>{{ txn_request.requested_at }}</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- Rejection Form -->
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="rejection_reason" class="form-label">
+                                <strong>Reason for Rejection</strong> <span class="text-muted">(optional)</span>
+                            </label>
+                            <textarea 
+                                name="rejection_reason" 
+                                id="rejection_reason" 
+                                class="form-control" 
+                                rows="3"
+                                placeholder="Enter reason for rejecting this transaction request..."
+                            ></textarea>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-x-circle"></i> Confirm Rejection
+                            </button>
+                            <a href="{% url 'pending_transaction_list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

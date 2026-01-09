@@ -1,12 +1,61 @@
 {% extends 'users/base.html' %}
 
 {% block content %}
-<div class="container mt-3" style="max-width: 500px;">
+<div class="container mt-3" style="max-width: 550px;">
+
+    <!-- Customer Info -->
+    <div class="card mb-3 border-0 shadow-sm">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <small class="text-muted">Customer</small>
+                    <h5 class="mb-0">{{ user.username }}</h5>
+                    <small class="text-muted">Account: {{ account.account_no }}</small>
+                </div>
+                <div class="text-end">
+                    <span class="badge {% if account.account_status == 'ACTIVE' %}bg-success{% else %}bg-warning{% endif %}">
+                        {{ account.account_status }}
+                    </span>
+                    <span class="badge {% if account.kyc_status == 'VERIFIED' %}bg-success{% else %}bg-warning{% endif %}">
+                        KYC: {{ account.kyc_status }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Balance Card -->
     <div class="balance-box mb-3 text-center">
         <p class="balance-label">Current Balance</p>
         <h3 class="balance-amount">₹{{ current_balance }}</h3>
+    </div>
+
+    <!-- Transaction Limits Info -->
+    <div class="alert alert-info mb-3">
+        <h6 class="alert-heading"><i class="bi bi-info-circle"></i> Transaction Limits</h6>
+        <div class="row">
+            <div class="col-6">
+                <small class="text-muted">Per Transaction</small>
+                <p class="mb-0 fw-bold">₹{{ limit_per_txn|floatformat:0 }}</p>
+            </div>
+            <div class="col-6">
+                <small class="text-muted">Daily Limit</small>
+                <p class="mb-0 fw-bold">₹{{ limit_per_day|floatformat:0 }}</p>
+            </div>
+        </div>
+        <hr class="my-2">
+        <small>
+            <i class="bi bi-graph-up"></i> Today's total: ₹{{ daily_total|floatformat:2 }} 
+            {% if pending_requests > 0 %}
+                <span class="text-warning">({{ pending_requests }} pending)</span>
+            {% endif %}
+        </small>
+    </div>
+
+    <!-- Warning for large transactions -->
+    <div class="alert alert-warning mb-3">
+        <i class="bi bi-exclamation-triangle"></i>
+        <strong>Note:</strong> Transactions exceeding the limits will be submitted for approval and won't be processed immediately.
     </div>
 
     <!-- Form Card -->
@@ -28,7 +77,7 @@
         <!-- Actions -->
         <div class="d-flex gap-3 mt-4">
             <button type="submit" class="btn btn-success flex-fill">
-                Submit
+                <i class="bi bi-check-circle"></i> Submit Transaction
             </button>
             <a href="{% url 'user_account_info' user.pk %}" class="btn btn-outline-secondary flex-fill">
                 Cancel

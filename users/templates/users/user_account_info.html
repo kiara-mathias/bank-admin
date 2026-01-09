@@ -67,20 +67,32 @@
             <div class="action-buttons">
                 {% if not is_customer %}
                     {# Staff can make transactions #}
-                    {% if account.account_status == 'ACTIVE' %}
+                    {% if account.account_status == 'ACTIVE' and account.kyc_status == 'VERIFIED' %}
                         <a href="{% url 'make_transaction' user.pk %}" class="btn btn-success">
                             <i class="bi bi-plus-circle"></i> New Transaction
                         </a>
                     {% else %}
-                        <button class="btn btn-secondary" disabled title="Account {{ account.account_status|title }}">
+                        <button class="btn btn-secondary" disabled title="{% if account.account_status != 'ACTIVE' %}Account {{ account.account_status|title }}{% else %}KYC {{ account.kyc_status }}{% endif %}">
                             <i class="bi bi-lock-fill"></i> New Transaction
                         </button>
                     {% endif %}
+                    <a href="{% url 'pending_transaction_list' %}" class="btn btn-warning">
+                        <i class="bi bi-hourglass-split"></i> Pending Approvals
+                    </a>
                     <a href="{% url 'download_account_pdf' user_id=user.pk %}?filter={{ filter_value }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">
                         <i class="bi bi-download"></i> Download PDF
                     </a>
                 {% else %}
-                    {# Customer can only download PDF #}
+                    {# Customer can request transactions #}
+                    {% if account.account_status == 'ACTIVE' and account.kyc_status == 'VERIFIED' %}
+                        <a href="{% url 'customer_request_transaction' %}" class="btn btn-success">
+                            <i class="bi bi-plus-circle"></i> Request Transaction
+                        </a>
+                    {% else %}
+                        <button class="btn btn-secondary" disabled title="{% if account.account_status != 'ACTIVE' %}Account {{ account.account_status|title }}{% else %}KYC not verified{% endif %}">
+                            <i class="bi bi-lock-fill"></i> Request Transaction
+                        </button>
+                    {% endif %}
                     <a href="{% url 'customer_download_pdf' %}?filter={{ filter_value }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">
                         <i class="bi bi-download"></i> Download PDF
                     </a>
@@ -131,6 +143,97 @@
         </div>
 
     </div>
+
+    {% if is_customer and pending_requests %}
+    <!-- ===== PENDING REQUESTS (Customer Only) ===== -->
+    <div class="transaction-section mt-4">
+        <div class="section-header">
+            <div>
+                <h3><i class="bi bi-hourglass-split text-warning"></i> Pending Transaction Requests</h3>
+            </div>
+            <span class="transaction-count">{{ pending_requests|length }} pending</span>
+        </div>
+        
+        <div class="table-container">
+            <table class="transaction-table">
+                <thead style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);">
+                    <tr>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Description</th>
+                        <th>Requested At</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in pending_requests %}
+                    <tr>
+                        <td>
+                            <span class="badge {% if req.txn_type == 'deposit' %}badge-success{% else %}badge-danger{% endif %}">
+                                {{ req.txn_type|title }}
+                            </span>
+                        </td>
+                        <td class="{% if req.txn_type == 'deposit' %}text-success{% else %}text-danger{% endif %}">
+                            ₹{{ req.amount }}
+                        </td>
+                        <td>{{ req.description|default:"-" }}</td>
+                        <td>{{ req.requested_at|date:"d M Y, H:i" }}</td>
+                        <td>
+                            <span class="badge" style="background-color: #f39c12; color: white;">
+                                <i class="bi bi-clock"></i> Awaiting Approval
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="text-muted mt-2" style="font-size: 0.9rem;">
+            <i class="bi bi-info-circle"></i> 
+            Your transaction requests are being reviewed by our staff. Once approved, they will appear in your transaction history.
+        </p>
+    </div>
+    {% endif %}
+
+    {% if is_customer and rejected_requests %}
+    <!-- ===== REJECTED REQUESTS (Customer Only) ===== -->
+    <div class="transaction-section mt-4">
+        <div class="section-header">
+            <div>
+                <h3><i class="bi bi-x-circle text-danger"></i> Rejected Requests</h3>
+            </div>
+            <span class="transaction-count">{{ rejected_requests|length }} rejected</span>
+        </div>
+        
+        <div class="table-container">
+            <table class="transaction-table">
+                <thead style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);">
+                    <tr>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Reason</th>
+                        <th>Rejected At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in rejected_requests %}
+                    <tr>
+                        <td>
+                            <span class="badge {% if req.txn_type == 'deposit' %}badge-success{% else %}badge-danger{% endif %}">
+                                {{ req.txn_type|title }}
+                            </span>
+                        </td>
+                        <td>₹{{ req.amount }}</td>
+                        <td>{{ req.rejection_reason|default:"No reason provided" }}</td>
+                        <td>{{ req.reviewed_at|date:"d M Y, H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
 </div>
 
 <!-- ===== JS ===== -->
