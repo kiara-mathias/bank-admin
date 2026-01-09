@@ -799,7 +799,7 @@ def customer_login_required(view_func):
 
 @customer_login_required
 def customer_dashboard(request):
-    """Customer dashboard - shows their own account and transactions"""
+    """Customer dashboard - shows their own account and transactions (reuses staff template)"""
     customer_id = request.session.get('customer_id')
     
     if not customer_id:
@@ -828,19 +828,22 @@ def customer_dashboard(request):
     transactions = Transaction.objects.filter(account=account).order_by('-txn_datetime')
     transactions = filter_transactions(transactions, filter_value, start_date, end_date)
     
-    return render(request, 'users/customer_dashboard.html', {
-        'customer': customer,
+    # Reuse the SAME template as staff, but with customer context
+    return render(request, 'users/user_account_info.html', {
+        'user': customer,  # Same variable name as staff view
         'account': account,
         'transactions': transactions,
         'filter_value': filter_value,
         'start_date': start_date,
         'end_date': end_date,
+        'is_customer': True,  # Flag to hide staff-only features in template
+        'is_supervisor': False,  # Customer can't make transactions
     })
 
 
 @customer_login_required
 def customer_download_pdf(request):
-    """Generate PDF statement for customer"""
+    """Generate PDF statement for customer - reuses SAME template as staff"""
     customer_id = request.session.get('customer_id')
     
     if not customer_id:
@@ -863,9 +866,10 @@ def customer_download_pdf(request):
     transactions = Transaction.objects.filter(account=account).order_by('txn_datetime')
     transactions = filter_transactions(transactions, filter_value, start_date, end_date)
     
+    # Reuse SAME PDF template as staff
     template_path = 'users/user_account_info_pdf.html'
     context = {
-        'user': customer,
+        'user': customer,  # Same variable name as staff view
         'account': account,
         'transactions': transactions,
         'filter_value': filter_value,

@@ -35,6 +35,7 @@
 </head>
 <body>
     {% if request.user.is_authenticated %}
+    {# Staff/Employee Navbar #}
     <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid d-flex justify-content-between align-items-center">
         
@@ -71,6 +72,34 @@
                     </li>
                 </ul>
             </div>
+        </div>
+
+    </div>
+</nav>
+{% elif request.session.is_customer %}
+    {# Customer Navbar #}
+    <nav class="navbar navbar-dark bg-dark">
+    <div class="container-fluid d-flex justify-content-between align-items-center">
+        
+        <!-- LEFT GROUP: Home -->
+        <div class="d-flex align-items-center gap-2">
+            <a class="navbar-brand" href="{% url 'customer_dashboard' %}">
+                <i class="bi bi-bank2"></i> My Account
+            </a>
+            {% block customer_navbar_left %}{% endblock %}
+        </div>
+
+        <!-- RIGHT GROUP: Customer info + Logout -->
+        <div class="d-flex align-items-center gap-2">
+            {% block customer_navbar_right %}{% endblock %}
+            
+            <span class="text-light">
+                <i class="bi bi-person-circle"></i> {{ request.session.customer_username }}
+            </span>
+            
+            <a href="{% url 'customer_logout' %}" class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-box-arrow-right"></i> Logout
+            </a>
         </div>
 
     </div>

@@ -65,19 +65,26 @@
                 <button type="submit" class="btn btn-sm btn-secondary">Apply</button>
             </form>
             <div class="action-buttons">
-                {% if user.account.account_status == 'ACTIVE' %}
-    <a href="{% url 'make_transaction' user.pk %}" class="btn btn-success">
-        <i class="bi bi-plus-circle"></i> New Transaction
-    </a>
-{% else %}
-    <button class="btn btn-secondary" disabled title="Account {{ user.account.account_status|title }}">
-        <i class="bi bi-lock-fill"></i> New Transaction
-    </button>
-{% endif %}
-
-                <a href="{% url 'download_account_pdf' user_id=user.pk %}?filter={{ filter_value }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">
-                    <i class="bi bi-download"></i> Download PDF
-                </a>
+                {% if not is_customer %}
+                    {# Staff can make transactions #}
+                    {% if account.account_status == 'ACTIVE' %}
+                        <a href="{% url 'make_transaction' user.pk %}" class="btn btn-success">
+                            <i class="bi bi-plus-circle"></i> New Transaction
+                        </a>
+                    {% else %}
+                        <button class="btn btn-secondary" disabled title="Account {{ account.account_status|title }}">
+                            <i class="bi bi-lock-fill"></i> New Transaction
+                        </button>
+                    {% endif %}
+                    <a href="{% url 'download_account_pdf' user_id=user.pk %}?filter={{ filter_value }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">
+                        <i class="bi bi-download"></i> Download PDF
+                    </a>
+                {% else %}
+                    {# Customer can only download PDF #}
+                    <a href="{% url 'customer_download_pdf' %}?filter={{ filter_value }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">
+                        <i class="bi bi-download"></i> Download PDF
+                    </a>
+                {% endif %}
             </div>
 
             <span class="transaction-count">{{ transactions|length }} transactions</span>
