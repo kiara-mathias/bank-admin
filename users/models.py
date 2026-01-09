@@ -96,6 +96,12 @@ class Employee(models.Model):
     def __str__(self):
         return self.username
 
+# ========== TRANSACTION LIMITS ==========
+# These can be moved to settings.py if needed
+TRANSACTION_LIMIT_PER_TXN = Decimal('10000.00')  # ₹10,000 per transaction
+TRANSACTION_LIMIT_PER_DAY = Decimal('50000.00')  # ₹50,000 per day
+
+
 #transaction table
 class Transaction(models.Model):
     account = models.ForeignKey(Account, on_delete=models.CASCADE)
@@ -113,6 +119,79 @@ class Transaction(models.Model):
     class Meta:
         managed = True
         db_table = 'transaction'
+
+
+# Transaction Request table (for pending approvals)
+class TransactionRequest(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending Review'),
+        ('APPROVED', 'Approved'),
+        ('REJECTED', 'Rejected'),
+    ]
+    
+    TXN_TYPE_CHOICES = [
+        ('deposit', 'Deposit'),
+        ('withdraw', 'Withdraw'),
+    ]
+    
+    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transaction_requests')
+    txn_type = models.CharField(max_length=10, choices=TXN_TYPE_CHOICES)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    description = models.TextField(blank=True, null=True)
+    
+    # Request metadata
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
+    requested_at = models.DateTimeField(auto_now_add=True)
+    
+    # Review metadata
+    reviewed_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='reviewed_transactions'
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+    
+    # Link to actual transaction (created after approval)
+    transaction = models.OneToOneField(
+        Transaction,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='request'
+    )
+    
+    class Meta:
+        managed = True
+        db_table = 'transaction_request'
+        ordering = ['-requested_at']
+    
+    def __str__(self):
+        return f"{self.txn_type.title()} ₹{self.amount} - {self.status}"
+    
+    @classmethod
+    def get_daily_total(cls, account, date=None):
+        """Get total approved + pending transaction amount for a specific day"""
+        from django.utils import timezone as tz
+        if date is None:
+            date = tz.now().date()
+        
+        # Sum of approved transactions today
+        approved_today = Transaction.objects.filter(
+            account=account,
+            txn_datetime__date=date
+        ).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
+        
+        # Sum of pending requests today
+        pending_today = cls.objects.filter(
+            account=account,
+            status='PENDING',
+            requested_at__date=date
+        ).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
+        
+        return approved_today + pending_today
 
 
 
