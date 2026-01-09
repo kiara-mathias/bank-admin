@@ -1,9 +1,7 @@
 {% extends 'users/base.html' %}
 
 {% block navbar_actions_left %}
-<span class="text-light">
-    <i class="bi bi-clock-history"></i> Pending Transaction Approvals
-</span>
+<a class="navbar-brand" href="{% url 'pending_transaction_list' %}">Pending Approvals</a>
 {% endblock %}
 
 {% block navbar_actions_right %}
@@ -13,134 +11,473 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <!-- Summary Cards -->
-    <div class="row mb-4">
-        <div class="col-md-4">
-            <div class="card bg-warning text-dark">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-hourglass-split"></i> Pending Requests</h5>
-                    <h2>{{ total_pending }}</h2>
+<div class="dashboard-container">
+
+    <!-- SUMMARY SECTION -->
+    <div class="search-filter-section">
+        <div class="summary-cards">
+            <div class="summary-card warning">
+                <i class="bi bi-hourglass-split"></i>
+                <div class="summary-info">
+                    <span class="summary-value">{{ total_pending }}</span>
+                    <span class="summary-label">Pending</span>
                 </div>
             </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card bg-info text-white">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-currency-rupee"></i> Total Amount Pending</h5>
-                    <h2>₹{{ total_amount_pending|floatformat:2 }}</h2>
+            <div class="summary-card info">
+                <i class="bi bi-currency-rupee"></i>
+                <div class="summary-info">
+                    <span class="summary-value">₹{{ total_amount_pending|floatformat:0 }}</span>
+                    <span class="summary-label">Total Amount</span>
                 </div>
             </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card bg-secondary text-white">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-info-circle"></i> Limits</h5>
-                    <p class="mb-1">Per Transaction: ₹{{ limit_per_txn|floatformat:0 }}</p>
-                    <p class="mb-0">Per Day: ₹{{ limit_per_day|floatformat:0 }}</p>
+            <div class="summary-card muted">
+                <i class="bi bi-shield-check"></i>
+                <div class="summary-info">
+                    <span class="summary-value">₹{{ limit_per_txn|floatformat:0 }} / ₹{{ limit_per_day|floatformat:0 }}</span>
+                    <span class="summary-label">Limits (Txn / Day)</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Pending Requests Table -->
-    <div class="card">
-        <div class="card-header bg-dark text-white">
-            <h5 class="mb-0"><i class="bi bi-list-check"></i> Pending Transaction Requests</h5>
-        </div>
-        <div class="card-body p-0">
-            {% if pending_requests %}
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Request ID</th>
-                            <th>Account</th>
-                            <th>Customer</th>
-                            <th>Type</th>
-                            <th>Amount</th>
-                            <th>Description</th>
-                            <th>Requested At</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for req in pending_requests %}
-                        <tr>
-                            <td><code>#{{ req.id }}</code></td>
-                            <td>
-                                <a href="{% url 'user_account_info' req.account.user.pk %}">
-                                    {{ req.account.account_no }}
-                                </a>
-                            </td>
-                            <td>
-                                <strong>{{ req.account.user.username }}</strong>
-                                <br><small class="text-muted">{{ req.account.user.email }}</small>
-                            </td>
-                            <td>
-                                <span class="badge {% if req.txn_type == 'deposit' %}bg-success{% else %}bg-danger{% endif %}">
-                                    {% if req.txn_type == 'deposit' %}
-                                        <i class="bi bi-arrow-down-circle"></i>
-                                    {% else %}
-                                        <i class="bi bi-arrow-up-circle"></i>
-                                    {% endif %}
-                                    {{ req.txn_type|title }}
-                                </span>
-                            </td>
-                            <td>
-                                <strong class="{% if req.txn_type == 'deposit' %}text-success{% else %}text-danger{% endif %}">
-                                    ₹{{ req.amount|floatformat:2 }}
-                                </strong>
-                                {% if req.amount > limit_per_txn %}
-                                    <br><small class="text-warning"><i class="bi bi-exclamation-triangle"></i> Exceeds limit</small>
+    <!-- PENDING REQUESTS TABLE -->
+    <div class="table-card">
+        <div class="table-wrapper">
+            <table class="users-table">
+                <thead>
+                    <tr>
+                        <th>
+                            <div class="th-content">
+                                <i class="bi bi-hash"></i>
+                                <span>ID</span>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="th-content">
+                                <i class="bi bi-credit-card"></i>
+                                <span>Account</span>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="th-content">
+                                <i class="bi bi-person"></i>
+                                <span>Customer</span>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="th-content">
+                                <i class="bi bi-arrow-left-right"></i>
+                                <span>Type</span>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="th-content">
+                                <i class="bi bi-currency-rupee"></i>
+                                <span>Amount</span>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="th-content">
+                                <i class="bi bi-calendar"></i>
+                                <span>Requested</span>
+                            </div>
+                        </th>
+                        <th class="actions-column">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in pending_requests %}
+                    <tr>
+                        <td><span class="account-number">#{{ req.id }}</span></td>
+                        <td>
+                            <a href="{% url 'user_account_info' req.account.user.pk %}" class="user-link">
+                                {{ req.account.account_no }}
+                            </a>
+                        </td>
+                        <td>
+                            <div class="customer-info">
+                                <span class="user-link">{{ req.account.user.username }}</span>
+                                <small class="text-muted">{{ req.account.user.email }}</small>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="status-badge {% if req.txn_type == 'deposit' %}status-success{% else %}status-danger{% endif %}">
+                                {% if req.txn_type == 'deposit' %}
+                                    <i class="bi bi-arrow-down-circle"></i>
+                                {% else %}
+                                    <i class="bi bi-arrow-up-circle"></i>
                                 {% endif %}
-                            </td>
-                            <td>{{ req.description|default:"-"|truncatewords:10 }}</td>
-                            <td>
-                                {{ req.requested_at|date:"d M Y" }}
-                                <br><small class="text-muted">{{ req.requested_at|time:"H:i" }}</small>
-                            </td>
-                            <td>
-                                <div class="btn-group btn-group-sm">
-                                    <a href="{% url 'approve_transaction' req.id %}" 
-                                       class="btn btn-success"
-                                       onclick="return confirm('Approve this {{ req.txn_type }} of ₹{{ req.amount }}?')">
-                                        <i class="bi bi-check-lg"></i> Approve
-                                    </a>
-                                    <a href="{% url 'reject_transaction' req.id %}" class="btn btn-danger">
-                                        <i class="bi bi-x-lg"></i> Reject
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-check-circle text-success" style="font-size: 4rem;"></i>
-                <h4 class="mt-3">No Pending Requests</h4>
-                <p class="text-muted">All transaction requests have been processed.</p>
-            </div>
-            {% endif %}
+                                {{ req.txn_type|title }}
+                            </span>
+                        </td>
+                        <td>
+                            <strong class="{% if req.txn_type == 'deposit' %}text-success{% else %}text-danger{% endif %}">
+                                ₹{{ req.amount|floatformat:2 }}
+                            </strong>
+                            {% if req.amount > limit_per_txn %}
+                                <small class="limit-warning"><i class="bi bi-exclamation-triangle"></i></small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="date-text">{{ req.requested_at|date:"d M Y" }}</span>
+                            <small class="text-muted">{{ req.requested_at|time:"H:i" }}</small>
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{% url 'approve_transaction' req.id %}" 
+                                   class="action-btn approve-btn"
+                                   onclick="return confirm('Approve {{ req.txn_type }} of ₹{{ req.amount }}?')"
+                                   title="Approve">
+                                    <i class="bi bi-check-lg"></i>
+                                </a>
+                                <a href="{% url 'reject_transaction' req.id %}" 
+                                   class="action-btn delete-btn"
+                                   title="Reject">
+                                    <i class="bi bi-x-lg"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="empty-state">
+                            <div class="empty-content">
+                                <i class="bi bi-check-circle"></i>
+                                <p>No pending requests</p>
+                                <small class="text-muted">All transaction requests have been processed</small>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
+
 </div>
 
 <style>
-.card {
-    border-radius: 12px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+@import url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css');
+
+/* ========== DASHBOARD CONTAINER ========== */
+.dashboard-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.25rem;
+    background-color: #f8f9fa;
+    min-height: 100vh;
 }
-.table th {
-    font-weight: 600;
+
+/* ========== SUMMARY CARDS ========== */
+.search-filter-section {
+    margin-bottom: 0.875rem;
+}
+
+.summary-cards {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.summary-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    border-left: 4px solid;
+}
+
+.summary-card.warning {
+    border-color: #f0ad4e;
+}
+
+.summary-card.warning i {
+    color: #f0ad4e;
+}
+
+.summary-card.info {
+    border-color: #667eea;
+}
+
+.summary-card.info i {
+    color: #667eea;
+}
+
+.summary-card.muted {
+    border-color: #6c757d;
+}
+
+.summary-card.muted i {
+    color: #6c757d;
+}
+
+.summary-card i {
+    font-size: 1.5rem;
+}
+
+.summary-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.summary-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+.summary-label {
+    font-size: 0.75rem;
+    color: #6c757d;
     text-transform: uppercase;
-    font-size: 0.8rem;
     letter-spacing: 0.5px;
 }
-.btn-group-sm .btn {
+
+/* ========== TABLE CARD ========== */
+.table-card {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+}
+
+/* ========== TABLE STYLES ========== */
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.users-table thead {
+    background: linear-gradient(135deg, #667eea 0%, #8eef5a 100%);
+    color: white;
+}
+
+.users-table thead th {
+    padding: 0.6rem 0.7rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border: none;
+    white-space: nowrap;
+}
+
+.th-content {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.actions-column {
+    text-align: center;
+}
+
+.users-table tbody tr {
+    border-bottom: 1px solid #f1f3f5;
+    transition: background-color 0.15s ease;
+}
+
+.users-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.users-table tbody td {
+    padding: 0.5rem 0.7rem;
+    vertical-align: middle;
+    color: #495057;
+    font-size: 0.875rem;
+}
+
+/* ========== CUSTOMER INFO ========== */
+.customer-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.customer-info small {
+    font-size: 0.75rem;
+}
+
+/* ========== USER LINK ========== */
+.user-link {
+    color: #2c3e50;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.user-link:hover {
+    color: #667eea;
+    text-decoration: underline;
+}
+
+/* ========== ACCOUNT NUMBER ========== */
+.account-number {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    background-color: #f8f9fa;
+    color: #6c757d;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid #e9ecef;
+}
+
+/* ========== STATUS BADGES ========== */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
     padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+/* ========== TEXT COLORS ========== */
+.text-success {
+    color: #28a745;
+}
+
+.text-danger {
+    color: #dc3545;
+}
+
+.text-muted {
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* ========== DATE TEXT ========== */
+.date-text {
+    color: #495057;
+    font-size: 0.85rem;
+}
+
+/* ========== LIMIT WARNING ========== */
+.limit-warning {
+    color: #f0ad4e;
+    margin-left: 0.25rem;
+}
+
+/* ========== ACTION BUTTONS ========== */
+.action-buttons {
+    display: flex;
+    gap: 0.35rem;
+    justify-content: center;
+}
+
+.action-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.approve-btn {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.approve-btn:hover {
+    background-color: #28a745;
+    color: white;
+    border-color: #28a745;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+
+.delete-btn {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.delete-btn:hover {
+    background-color: #dc3545;
+    color: white;
+    border-color: #dc3545;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
+
+/* ========== EMPTY STATE ========== */
+.empty-state {
+    padding: 2.5rem 1.5rem !important;
+    text-align: center;
+}
+
+.empty-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.empty-content i {
+    font-size: 3rem;
+    color: #28a745;
+}
+
+.empty-content p {
+    color: #495057;
+    font-size: 1rem;
+    margin: 0;
+    font-weight: 500;
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 768px) {
+    .dashboard-container {
+        padding: 1rem;
+    }
+
+    .summary-cards {
+        flex-direction: column;
+    }
+
+    .summary-card {
+        width: 100%;
+    }
+
+    .users-table thead th,
+    .users-table tbody td {
+        padding: 0.45rem 0.4rem;
+        font-size: 0.8rem;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
 }
 </style>
 {% endblock %}
