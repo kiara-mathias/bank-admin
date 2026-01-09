@@ -46,4 +46,9 @@ urlpatterns = [
 
     # PDF download
     path('users/<int:user_id>/download_pdf/', login_required(views.download_account_pdf), name='download_account_pdf'),
+    
+    # Customer views
+    path('customer/dashboard/', views.customer_dashboard, name='customer_dashboard'),
+    path('customer/download_pdf/', views.customer_download_pdf, name='customer_download_pdf'),
+    path('customer/logout/', views.customer_logout, name='customer_logout'),
 ]

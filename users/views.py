@@ -65,6 +65,7 @@ def get_user_role(request):
     if not username:
         return JsonResponse({'role': None})
     
+    # First check if it's a Django User (Employee)
     try:
         user = User.objects.get(username=username)
         
@@ -80,7 +81,16 @@ def get_user_role(request):
             return JsonResponse({'role': None})
             
     except User.DoesNotExist:
-        return JsonResponse({'role': None})
+        pass
+    
+    # Check if it's a Customer (UsersNew)
+    try:
+        customer = UsersNew.objects.get(username=username)
+        return JsonResponse({'role': 'Customer'})
+    except UsersNew.DoesNotExist:
+        pass
+    
+    return JsonResponse({'role': None})
 
 
 def custom_login(request):
@@ -89,6 +99,28 @@ def custom_login(request):
         password = request.POST.get('password')
         role = request.POST.get('role')
 
+        # ========== CUSTOMER LOGIN ==========
+        if role == 'Customer':
+            try:
+                customer = UsersNew.objects.get(username=username)
+                
+                # Check password (plain text comparison for customers)
+                if customer.password == password:
+                    # Store customer info in session
+                    request.session['customer_id'] = customer.emp_id
+                    request.session['customer_username'] = customer.username
+                    request.session['is_customer'] = True
+                    print(f"[TIMING] Customer '{username}' logged in successfully")
+                    return redirect('customer_dashboard')
+                else:
+                    messages.error(request, "Invalid username or password.")
+                    return render(request, 'users/login.html')
+                    
+            except UsersNew.DoesNotExist:
+                messages.error(request, "Invalid username or password.")
+                return render(request, 'users/login.html')
+
+        # ========== EMPLOYEE LOGIN (Manager/Supervisor/Clerk) ==========
         # TIMING: Track authentication performance
         start_time = time.time()
         user = authenticate(request, username=username, password=password)
@@ -127,6 +159,11 @@ def custom_login(request):
                 login(request, user)
                 login_time = time.time() - login_start
                 print(f"[TIMING] login() took {login_time:.2f}s")
+                
+                # Clear any customer session data
+                request.session.pop('customer_id', None)
+                request.session.pop('customer_username', None)
+                request.session.pop('is_customer', None)
                 
                 # Redirect based on role
                 # Superuser -> Employee List by default (Manager View) or User List if they chose Supervisor/Clerk
@@ -746,3 +783,111 @@ def update_kyc_status(request, account_id):
         messages.success(request, f'KYC status updated to {new_kyc_status}')
 
     return redirect('user_list')
+
+
+# ========== CUSTOMER VIEWS ==========
+
+def customer_login_required(view_func):
+    """Decorator to check if customer is logged in via session"""
+    def wrapper(request, *args, **kwargs):
+        if not request.session.get('is_customer'):
+            messages.error(request, "Please login as a customer to access this page.")
+            return redirect('login')
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+@customer_login_required
+def customer_dashboard(request):
+    """Customer dashboard - shows their own account and transactions"""
+    customer_id = request.session.get('customer_id')
+    
+    if not customer_id:
+        messages.error(request, "Session expired. Please login again.")
+        return redirect('login')
+    
+    try:
+        customer = UsersNew.objects.get(emp_id=customer_id)
+    except UsersNew.DoesNotExist:
+        messages.error(request, "Customer not found. Please login again.")
+        request.session.flush()
+        return redirect('login')
+    
+    # Get or create account for the customer
+    account, created = Account.objects.get_or_create(
+        user=customer,
+        defaults={'current_balance': Decimal('500.00')}
+    )
+    
+    # Get filter parameters
+    filter_value = request.GET.get('filter')
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    
+    # Get transactions
+    transactions = Transaction.objects.filter(account=account).order_by('-txn_datetime')
+    transactions = filter_transactions(transactions, filter_value, start_date, end_date)
+    
+    return render(request, 'users/customer_dashboard.html', {
+        'customer': customer,
+        'account': account,
+        'transactions': transactions,
+        'filter_value': filter_value,
+        'start_date': start_date,
+        'end_date': end_date,
+    })
+
+
+@customer_login_required
+def customer_download_pdf(request):
+    """Generate PDF statement for customer"""
+    customer_id = request.session.get('customer_id')
+    
+    if not customer_id:
+        return redirect('login')
+    
+    try:
+        customer = UsersNew.objects.get(emp_id=customer_id)
+    except UsersNew.DoesNotExist:
+        return redirect('login')
+    
+    account, created = Account.objects.get_or_create(
+        user=customer,
+        defaults={'current_balance': Decimal('500.00')}
+    )
+    
+    filter_value = request.GET.get('filter')
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    
+    transactions = Transaction.objects.filter(account=account).order_by('txn_datetime')
+    transactions = filter_transactions(transactions, filter_value, start_date, end_date)
+    
+    template_path = 'users/user_account_info_pdf.html'
+    context = {
+        'user': customer,
+        'account': account,
+        'transactions': transactions,
+        'filter_value': filter_value,
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    
+    html = get_template(template_path).render(context)
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="Account_Statement_{customer.username}.pdf"'
+    
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    if pisa_status.err:
+        return HttpResponse('PDF generation error')
+    
+    return response
+
+
+def customer_logout(request):
+    """Logout customer by clearing session"""
+    request.session.pop('customer_id', None)
+    request.session.pop('customer_username', None)
+    request.session.pop('is_customer', None)
+    messages.success(request, "You have been logged out successfully.")
+    return redirect('login')
