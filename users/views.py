@@ -676,6 +676,7 @@ def make_transaction(request, user_id):
         'daily_total': daily_total,
         'limit_per_txn': TRANSACTION_LIMIT_PER_TXN,
         'limit_per_day': TRANSACTION_LIMIT_PER_DAY,
+        'is_customer': False,  # Staff view
     })
 
 
@@ -1144,14 +1145,17 @@ def customer_request_transaction(request):
     pending_count = TransactionRequest.objects.filter(account=account, status='PENDING').count()
     daily_total = TransactionRequest.get_daily_total(account)
     
-    return render(request, 'users/customer_transaction_request.html', {
+    # Reuse SAME template as staff
+    return render(request, 'users/transaction_form.html', {
         'form': form,
-        'customer': customer,
+        'user': customer,  # Same variable name as staff view
         'account': account,
-        'pending_count': pending_count,
+        'current_balance': account.current_balance,
+        'pending_requests': pending_count,
         'daily_total': daily_total,
         'limit_per_txn': TRANSACTION_LIMIT_PER_TXN,
         'limit_per_day': TRANSACTION_LIMIT_PER_DAY,
+        'is_customer': True,  # Flag for template
     })
 
 

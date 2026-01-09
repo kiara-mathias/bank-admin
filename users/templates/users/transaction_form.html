@@ -79,9 +79,15 @@
             <button type="submit" class="btn btn-success flex-fill">
                 <i class="bi bi-check-circle"></i> Submit Transaction
             </button>
-            <a href="{% url 'user_account_info' user.pk %}" class="btn btn-outline-secondary flex-fill">
-                Cancel
-            </a>
+            {% if is_customer %}
+                <a href="{% url 'customer_dashboard' %}" class="btn btn-outline-secondary flex-fill">
+                    Cancel
+                </a>
+            {% else %}
+                <a href="{% url 'user_account_info' user.pk %}" class="btn btn-outline-secondary flex-fill">
+                    Cancel
+                </a>
+            {% endif %}
         </div>
     </form>
 
